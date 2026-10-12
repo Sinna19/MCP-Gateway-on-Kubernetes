@@ -1,0 +1,6 @@
+.venv/
+node_modules/
+__pycache__/
+.env
+*.env
+values-secret*.yaml
