@@ -1,0 +1,115 @@
+{{- $scheme := ternary "https" "http" .Values.global.ingress.tls }}
+{{- $url := printf "%s://%s.%s" $scheme .Values.wordpress.host .Values.global.domain }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-wordpress
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # The wp-content PVC is ReadWriteOnce, so the old pod must stop before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wordpress
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wordpress
+        {{- include "store.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsUser: 33
+        runAsGroup: 33
+        runAsNonRoot: true
+        fsGroup: 33
+        # Lets apache (non-root) bind port 80.
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: "0"
+      initContainers:
+        # The image entrypoint copies core with tar, which fails when not root (it tries to chmod the
+        # mount root, exit 2). cp does not. -n keeps files already on the wp-content PVC.
+        - name: copy-core
+          image: {{ .Values.wordpress.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+          command: ["sh", "-c", "cp -rn /usr/src/wordpress/. /var/www/html/"]
+          resources:
+            {{- toYaml .Values.wordpress.resources | nindent 12 }}
+          volumeMounts:
+            - name: core
+              mountPath: /var/www/html
+            - name: content
+              mountPath: /var/www/html/wp-content
+      containers:
+        - name: wordpress
+          image: {{ .Values.wordpress.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: "store-mariadb:3306"
+            - name: WORDPRESS_DB_NAME
+              value: {{ .Values.mariadb.database | quote }}
+            - name: WORDPRESS_DB_USER
+              value: {{ .Values.mariadb.user | quote }}
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mariadb.existingSecret }}
+                  key: password
+            {{- range $env, $key := dict "WORDPRESS_AUTH_KEY" "auth-key" "WORDPRESS_SECURE_AUTH_KEY" "secure-auth-key" "WORDPRESS_LOGGED_IN_KEY" "logged-in-key" "WORDPRESS_NONCE_KEY" "nonce-key" "WORDPRESS_AUTH_SALT" "auth-salt" "WORDPRESS_SECURE_AUTH_SALT" "secure-auth-salt" "WORDPRESS_LOGGED_IN_SALT" "logged-in-salt" "WORDPRESS_NONCE_SALT" "nonce-salt" }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.wordpress.existingSaltsSecret }}
+                  key: {{ $key }}
+            {{- end }}
+            # Site URL comes from values so local and prod hosts both work.
+            - name: WORDPRESS_CONFIG_EXTRA
+              value: |
+                define('WP_HOME', '{{ $url }}');
+                define('WP_SITEURL', '{{ $url }}');
+          startupProbe:
+            httpGet:
+              path: /license.txt
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          # Static file: a database outage must not restart WordPress.
+          livenessProbe:
+            httpGet:
+              path: /license.txt
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          # Goes through PHP and the database. The redirect to install.php before setup counts as ready.
+          readinessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.wordpress.resources | nindent 12 }}
+          volumeMounts:
+            - name: core
+              mountPath: /var/www/html
+            - name: content
+              mountPath: /var/www/html/wp-content
+      volumes:
+        # WordPress core is copied from the image on every start; only wp-content is persistent.
+        - name: core
+          emptyDir: {}
+        - name: content
+          persistentVolumeClaim:
+            claimName: store-wordpress-content

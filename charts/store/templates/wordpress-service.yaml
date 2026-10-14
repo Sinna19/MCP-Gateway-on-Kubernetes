@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-wordpress
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: wordpress
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

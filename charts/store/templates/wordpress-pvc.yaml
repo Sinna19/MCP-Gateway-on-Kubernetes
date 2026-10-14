@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: store-wordpress-content
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.wordpress.storage.size }}

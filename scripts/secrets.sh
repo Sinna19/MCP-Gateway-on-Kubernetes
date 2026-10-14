@@ -15,3 +15,15 @@ else
     --from-literal=password="$(openssl rand -hex 16)" >/dev/null
   echo "secret store-db: created"
 fi
+
+# WordPress auth keys/salts. Fixed so logins and carts survive pod restarts (ADR 003).
+if kubectl -n "$NS" get secret store-wp-salts >/dev/null 2>&1; then
+  echo "secret store-wp-salts: exists, skipped"
+else
+  args=()
+  for k in auth-key secure-auth-key logged-in-key nonce-key auth-salt secure-auth-salt logged-in-salt nonce-salt; do
+    args+=("--from-literal=$k=$(openssl rand -hex 32)")
+  done
+  kubectl -n "$NS" create secret generic store-wp-salts "${args[@]}" >/dev/null
+  echo "secret store-wp-salts: created"
+fi

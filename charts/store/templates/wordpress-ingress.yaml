@@ -1,0 +1,26 @@
+{{- $host := printf "%s.%s" .Values.wordpress.host .Values.global.domain }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: store-wordpress
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.global.ingress.className }}
+  {{- if .Values.global.ingress.tls }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: store-wordpress-tls
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: store-wordpress
+                port:
+                  name: http
