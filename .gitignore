@@ -13,3 +13,4 @@ dist/
 *.tgz
 charts/*/charts/
 charts/*/Chart.lock
+docs/ASSIGNMENT.md
