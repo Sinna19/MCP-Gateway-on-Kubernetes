@@ -21,9 +21,9 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 
 ## Phase 0: Foundation
 - [x] Repo layout from CLAUDE.md, `.gitignore` (node_modules, .env*, *.tgz), README stub
-- [ ] `scripts/cluster-up.sh`: k3d cluster `urumi` with ports 80/443 mapped to the load balancer
+- [x] `scripts/cluster-up.sh`: k3d cluster `urumi` with ports 80/443 mapped to the load balancer
 - [x] `charts/platform` umbrella with empty subcharts; `deploy/values-local.yaml`, `deploy/values-prod.yaml`
-- [ ] Makefile targets: cluster-up, cluster-down, images, deploy, lint, test, dod. `lint` and `test` print only failures and a one-line summary (saves tokens on every run)
+- [x] Makefile targets: cluster-up, cluster-down, images, deploy, lint, test, dod. `lint` and `test` print only failures and a one-line summary (saves tokens on every run)
 - [ ] Deploy the empty umbrella chart to the VPS with `values-prod.yaml` (once the VPS is rented; still week 1)
 - **Accept:** `make cluster-up && make deploy` succeeds; `kubectl get ns urumi` exists; `make lint` clean.
 
