@@ -1,0 +1,19 @@
+apiVersion: v2
+name: platform
+description: Umbrella chart for the Urumi MCP gateway platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: store
+    version: 0.1.0
+    repository: file://../store
+  - name: woo-mcp
+    version: 0.1.0
+    repository: file://../woo-mcp
+  - name: gateway
+    version: 0.1.0
+    repository: file://../gateway
+  - name: upstreams
+    version: 0.1.0
+    repository: file://../upstreams

@@ -4,3 +4,12 @@ __pycache__/
 .env
 *.env
 values-secret*.yaml
+*.pdf
+*.zip
+
+# build/deps
+dist/
+.env*
+*.tgz
+charts/*/charts/
+charts/*/Chart.lock

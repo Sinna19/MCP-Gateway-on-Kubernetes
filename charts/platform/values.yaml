@@ -1,0 +1,7 @@
+# Defaults shared by all environments. Per-environment differences live in deploy/values-*.yaml.
+global:
+  domain: localtest.me
+  storageClass: ""
+  ingress:
+    className: traefik
+    tls: false

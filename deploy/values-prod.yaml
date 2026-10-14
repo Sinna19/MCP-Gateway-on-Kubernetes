@@ -1,0 +1,7 @@
+# VPS k3s. Replace the domain with the real one once DNS exists (see ADR 001).
+global:
+  domain: example.com
+  storageClass: local-path
+  ingress:
+    className: traefik
+    tls: false

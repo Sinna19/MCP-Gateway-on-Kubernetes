@@ -1,0 +1,7 @@
+# Local k3d cluster. *.localtest.me resolves to 127.0.0.1, so no /etc/hosts edits.
+global:
+  domain: localtest.me
+  storageClass: local-path
+  ingress:
+    className: traefik
+    tls: false

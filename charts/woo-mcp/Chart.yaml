@@ -1,0 +1,6 @@
+apiVersion: v2
+name: woo-mcp
+description: woo-mcp subchart (empty placeholder, filled in a later phase)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
