@@ -28,9 +28,9 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept:** `make cluster-up && make deploy` succeeds; `kubectl get ns urumi` exists; `make lint` clean.
 
 ## Phase 1: Store
-- [ ] MariaDB StatefulSet + PVC + Secret (created by script, not templated with a literal)
+- [x] MariaDB StatefulSet + PVC + Secret (created by script, not templated with a literal)
 - [ ] WordPress Deployment + PVC for `wp-content`, Service, Ingress `shop.localtest.me`
-- [ ] Setup Job (normal Job, not a Helm hook; idempotent; `ttlSecondsAfterFinished: 600`) with WP-CLI: install WP, install + activate WooCommerce, enable COD, seed 3 products, create the integration user + Application Password, write it to Secret `woo-api` (needs a ServiceAccount with get/create/patch on that one Secret only)
+- [ ] Setup Job (plain Job named setup-<release revision>, ttlSecondsAfterFinished: 600, idempotent; not a Helm hook) with WP-CLI: install WP, install + activate WooCommerce, enable COD, seed 3 products, create the integration user + Application Password, write it to Secret `woo-api` (needs a ServiceAccount with get/create/patch on that one Secret only)
 - [ ] Probes + requests/limits on all of it
 - **Accept:** checkout with COD at `http://shop.localtest.me`; order visible in WP admin; `kubectl delete pod` on WordPress and MariaDB, data still there; Job rerun is a no-op.
 

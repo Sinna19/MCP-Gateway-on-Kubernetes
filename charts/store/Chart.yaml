@@ -1,6 +1,6 @@
 apiVersion: v2
 name: store
-description: store subchart (empty placeholder, filled in a later phase)
+description: WordPress + WooCommerce store with MariaDB
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

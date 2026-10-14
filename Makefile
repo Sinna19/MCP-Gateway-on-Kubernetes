@@ -2,7 +2,7 @@ SHELL := bash
 NS := urumi
 CHARTS := store woo-mcp gateway upstreams platform
 
-.PHONY: cluster-up cluster-down images deps deploy lint test dod
+.PHONY: cluster-up cluster-down images deps secrets deploy lint test dod
 
 cluster-up:
 	scripts/cluster-up.sh
@@ -17,7 +17,10 @@ images:
 deps:
 	helm dependency update charts/platform >/dev/null
 
-deploy: deps
+secrets:
+	scripts/secrets.sh
+
+deploy: deps secrets
 	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml
 
 # Prints failures only, then a one-line summary. eslint/tsc get added with the first TS service.

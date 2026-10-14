@@ -1,1 +1,17 @@
-# store values (filled in a later phase)
+# store subchart values. global.* comes from the umbrella chart (deploy/values-*.yaml).
+mariadb:
+  image: mariadb:11.4
+  database: wordpress
+  user: wordpress
+  # Secret is created by scripts/secrets.sh, never by Helm (ADR 002).
+  # Keys: root-password, password.
+  existingSecret: store-db
+  storage:
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
