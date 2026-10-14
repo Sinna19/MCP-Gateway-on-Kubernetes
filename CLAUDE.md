@@ -8,7 +8,7 @@ WooCommerce hosting with a team MCP gateway. Urumi AI FDE internship, Round 1 (t
 ## The one rule that overrides speed
 
 I (Ash) must explain and defend every part of this system in a demo video and a live interview.
-- Before non-trivial code, state the approach in 3 to 6 bullets and why. Wait for my OK on anything architectural.
+- Before non-trivial code, state the approach in 3 to 6 bullets and why, plus the exact commands that will prove it works. Wait for my OK on anything architectural.
 - Boring, readable code. No abstraction I can't explain in one sentence.
 - Design decisions get a short ADR in `docs/decisions/NNN-title.md`.
 
