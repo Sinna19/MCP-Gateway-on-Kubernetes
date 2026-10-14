@@ -1,0 +1,16 @@
+---
+paths:
+  - "charts/**"
+  - "deploy/**"
+  - "scripts/**"
+---
+# Kubernetes rules
+
+- Every workload: readiness + liveness probes, resource requests + limits, non-root where the image allows.
+- No secret values in templates, values files, or ConfigMaps. Values reference Secret names; secrets are created by `scripts/` or via `existingSecret`. Never print secret values in output.
+- woo-mcp and the extra upstreams: ClusterIP only, no Ingress, NetworkPolicy allowing ingress only from gateway pods.
+- PVCs for MariaDB data and `wp-content`; storageClass from values.
+- Local vs prod differences only in `deploy/values-*.yaml`. If a template needs `if prod`, make it a value.
+- k3d needs `k3d image import` for local images and `imagePullPolicy: IfNotPresent`.
+- Traefik must not buffer SSE responses on `/mcp`.
+- Quiet output: `helm template ... | grep -A3 <thing>` instead of dumping full renders; `kubectl get -o name`; `kubectl logs --tail=50`; `kubectl describe` piped through `sed -n '/Events/,$p'` when you only need events.
