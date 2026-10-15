@@ -64,4 +64,5 @@ My plan has usage limits, and long contexts make you worse. Follow these every s
 - **Done means verified.** A task is done only when you've run its check (test, lint, `curl`, `kubectl`) and shown me the command and a line of output. Never report "should work".
 - If a task is big (new service, new chart, gateway core, agent loop) and I'm not in plan mode, suggest I switch before you start. Small fixes: just do them.
 - Small conventional commits (`feat(gateway): …`) at every green point.
+- Stage files by name. Never git add -A or git add .
 - When something fails in the cluster, read events and logs before changing code.
