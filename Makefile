@@ -1,6 +1,7 @@
 SHELL := bash
 NS := urumi
 CHARTS := store woo-mcp gateway upstreams platform
+TS_SERVICES := woo-mcp
 
 .PHONY: cluster-up cluster-down images deps secrets deploy lint test dod
 
@@ -31,11 +32,18 @@ lint: deps
 	  out=$$(helm lint charts/$$c -f deploy/values-local.yaml 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
 	out=$$(helm template platform charts/platform -f deploy/values-local.yaml 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
+	for s in $(TS_SERVICES); do \
+	  out=$$(npm --prefix services/$$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
+	done; \
 	if [ $$fail = 0 ]; then echo "lint: ok"; else echo "lint: FAILED"; exit 1; fi
 
-# No tests until Phase 2/3. Becomes the unit-test runner with a dot reporter.
+# Dot reporter prints failures only. Add each TS service to TS_SERVICES.
 test:
-	@echo "test: no tests yet"
+	@fail=0; \
+	for s in $(TS_SERVICES); do \
+	  out=$$(npm --prefix services/$$s test 2>&1) || { echo "$$out" | tail -30; fail=1; }; \
+	done; \
+	if [ $$fail = 0 ]; then echo "test: ok"; else echo "test: FAILED"; exit 1; fi
 
 dod:
 	scripts/dod-check.sh
