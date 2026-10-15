@@ -23,5 +23,5 @@ export async function createTestDb(): Promise<{ pool: pg.Pool; drop: () => Promi
 }
 
 export async function resetData(pool: pg.Pool): Promise<void> {
-  await pool.query("TRUNCATE audit_log, api_keys, upstream_servers, users RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE audit_log, api_keys, sessions, invites, upstream_servers, users RESTART IDENTITY CASCADE");
 }

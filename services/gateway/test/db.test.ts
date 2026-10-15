@@ -19,9 +19,11 @@ describe("migrate", () => {
   });
 
   it("running it again is a no-op", async () => {
+    const count = async () => (await pool.query("SELECT count(*)::int AS n FROM schema_migrations")).rows[0].n;
+    const before = await count();
     await migrate(pool);
-    const { rows } = await pool.query("SELECT count(*)::int AS n FROM schema_migrations");
-    expect(rows[0].n).toBe(1);
+    expect(await count()).toBe(before);
+    expect(before).toBeGreaterThan(0);
   });
 
   it("rejects a slug with a double underscore, uppercase, or more than 20 chars", async () => {

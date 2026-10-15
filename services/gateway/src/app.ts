@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
 import type pg from "pg";
 import { Gateway, type ToolBackend } from "./gateway.js";
+import { createApiRouter } from "./api/router.js";
 import { createMcpEndpoint } from "./mcp-endpoint.js";
 
 export interface AppOptions {
@@ -8,6 +9,7 @@ export interface AppOptions {
   upstreams: ToolBackend & { on(event: "toolsChanged", listener: () => void): unknown };
   idleMs?: number;
   now?: () => number;
+  cookieSecure?: boolean;
 }
 
 export interface App {
@@ -41,6 +43,7 @@ export function createApp(options: AppOptions): App {
     );
   });
   app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
+  app.use("/api", createApiRouter({ pool, cookieSecure: options.cookieSecure ?? false }));
   app.use(jsonErrors);
 
   return { express: app, gateway, sessionCount: mcp.sessionCount, sweep: mcp.sweep, closeSessions: mcp.closeAll };

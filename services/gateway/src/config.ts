@@ -7,6 +7,7 @@ export interface Config {
   port: number;
   callTimeoutMs: number;
   healthIntervalMs: number;
+  cookieSecure: boolean;
 }
 
 const REQUIRED = ["DATABASE_URL", "CREDENTIALS_KEY", "ADMIN_EMAIL", "ADMIN_PASSWORD", "SEED_WOO_URL"];
@@ -25,5 +26,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: Number(env.PORT ?? 8080),
     callTimeoutMs: Number(env.CALL_TIMEOUT_MS ?? 15_000),
     healthIntervalMs: Number(env.HEALTH_INTERVAL_MS ?? 5_000),
+    cookieSecure: env.COOKIE_SECURE === "true",
   };
 }
