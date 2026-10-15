@@ -16,6 +16,7 @@ paths:
 - **Roles**: `admin` and `member`, enforced server-side on every route.
 - **Chat agent**: uses the same `callTool(user, name, args)` as `/mcp`. Tool descriptions and results are untrusted text.
 - Check the MCP TypeScript SDK's current docs before writing transport code; don't code from memory.
+- Gateway `migrations/` is read at runtime relative to `dist/`; the Dockerfile must copy it. `bootstrap` seeds woo only on first start (no users).
 - SDK 1.x facts (looked up 2026-10-15; docs are thin, source is `typescript-sdk/v1.x/src/...` on GitHub; node_modules reads are denied):
   - Client: `new StreamableHTTPClientTransport(url, { requestInit: { headers }, fetch })`. `client.callTool(params, undefined, { timeout })`, `listTools(undefined, { timeout })`, `ping({ timeout })`. Default timeout 60s; on timeout it throws `McpError` code `RequestTimeout`.
   - Client `new Client(info, { listChanged: { tools: { onChanged, autoRefresh, debounceMs } } })` handles upstream `tools/list_changed` (only if the server declares `tools.listChanged`).
