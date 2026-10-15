@@ -77,6 +77,10 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] Full manual rehearsal with users A and B, following the DoD in `docs/ASSIGNMENT.md`
 - [ ] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
 - [ ] Optional: woo-mcp requires a bearer token, sent by the gateway as an upstream credential
+- [ ] Gateway NetworkPolicy: ingress only from Traefik (kube-system)
+- [ ] woo-mcp hop token (gateway sends it as an upstream credential)
+- [ ] CREDENTIALS_KEY rotation (re-encrypt stored credentials)
+- [ ] Throttle `api_keys.last_used_at` writes
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster.
 
 ## Phase 8: VPS (k3s)
@@ -85,6 +89,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use
 - [ ] VPS is single-node: setup Job and WordPress share an RWO PVC; say so in README (podAffinity if ever multi-node)
 - [ ] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
+- [ ] k3s `--secrets-encryption` so Secrets are encrypted at rest
+- [ ] Postgres backups for the gateway database (pg_dump CronJob or similar)
 - **Accept:** DoD flow works at the public hostname; README lists exactly what differs from local.
 
 ## Phase 9: Docs + demo

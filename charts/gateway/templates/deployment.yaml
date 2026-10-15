@@ -20,6 +20,8 @@ spec:
         {{- include "gateway.labels" . | nindent 8 }}
     spec:
       automountServiceAccountToken: false
+      # 10s drain in index.ts plus margin.
+      terminationGracePeriodSeconds: 15
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -86,6 +88,13 @@ spec:
               value: {{ .Values.seedWooUrl | quote }}
             - name: COOKIE_SECURE
               value: {{ .Values.global.ingress.tls | quote }}
+          # Room for migrate() and bootstrap on first start (up to 60s) before liveness takes over.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
           # The process is up.
           livenessProbe:
             httpGet:

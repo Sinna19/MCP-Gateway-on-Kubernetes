@@ -15,9 +15,11 @@ upstreams.start();
 
 const app = createApp({ pool, upstreams, credentialsKey: config.credentialsKey, cookieSecure: config.cookieSecure });
 const server = app.express.listen(config.port, () => console.log(`gateway listening on :${config.port}`));
-// Node's defaults allow a client to hold a socket open for 5 minutes (slowloris).
+// Node's defaults allow a client to hold a socket open for 5 minutes (slowloris), so requestTimeout stays short.
+// keepAliveTimeout must be longer than Traefik's 90s idle timeout, or Node closes a socket Traefik is about to reuse (502).
 server.requestTimeout = 15_000;
-server.headersTimeout = 10_000;
+server.keepAliveTimeout = 95_000;
+server.headersTimeout = 96_000;
 
 const sweeper = setInterval(app.sweep, 60_000);
 sweeper.unref();
@@ -27,5 +29,6 @@ process.on("SIGTERM", () => {
   app.closeSessions();
   void upstreams.stop();
   server.close(() => void pool.end().then(() => process.exit(0)));
-  server.closeAllConnections();
+  // Let in-flight requests finish for 10s, then cut what is left (terminationGracePeriodSeconds is 15).
+  setTimeout(() => server.closeAllConnections(), 10_000).unref();
 });
