@@ -47,8 +47,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] (3a: bootstrap code done, reads env; 3c: Secret + chart) Bootstrap admin from a Secret on first start; seed woo-mcp as the first registered server
 - [x] (3a) Upstream manager: one MCP client per enabled upstream, connect with timeout, cached tools, background health check every ~5s, status Connected / Unreachable / Disabled
 - [x] (3a) `/mcp` endpoint: bearer API key auth, `tools/list` aggregates `<slug>__<tool>`, `tools/call` routes, per-call timeout, audit in `finally`, `list_changed` on registry change
-- [ ] (3b) REST API for dashboard: auth (session cookie), servers CRUD (admin), members + invites (admin), keys (own; admin can revoke any), audit query
-- [ ] (3a: AES-GCM + manager done, 3b: serializers + test) Credentials encrypted at rest; response serializers never include them (unit test asserts this)
+- [x] (3b) REST API for dashboard: auth (session cookie), servers CRUD (admin), members + invites (admin), keys (own; admin can revoke any), audit query
+- [x] (3a: AES-GCM + manager done, 3b: serializers + test) Credentials encrypted at rest; response serializers never include them (unit test asserts this)
 - **Accept:** Claude Code connects with `claude mcp add --transport http urumi http://app.localtest.me/mcp --header "Authorization: Bearer umk_..."` and lists woo tools; revoked key gets 401; `kubectl delete pod` on woo-mcp leaves the endpoint working and the dashboard shows it Unreachable within one health interval (~5s).
 
 ## Phase 4: Extra upstreams
