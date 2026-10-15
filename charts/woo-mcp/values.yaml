@@ -1,1 +1,24 @@
-# woo-mcp values (filled in a later phase)
+image:
+  repository: urumi/woo-mcp
+  # Set by `make deploy` to the tree hash of services/woo-mcp.
+  tag: latest
+
+port: 3000
+
+# In-cluster URL of the store Service. Plain HTTP is fine inside the cluster.
+wooUrl: http://store-wordpress
+
+# Secret created by scripts/secrets.sh (username) and the store setup Job (password). Keys: username, password.
+existingSecret: woo-api
+
+# Pods allowed to reach woo-mcp. Only the gateway.
+allowedClientLabel:
+  app.kubernetes.io/name: gateway
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 192Mi

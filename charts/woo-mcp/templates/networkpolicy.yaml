@@ -1,0 +1,22 @@
+# woo-mcp can create products and change orders, so only the gateway may call it.
+# Once a pod is selected by an Ingress policy, everything not listed here is dropped.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woo-mcp-allow-gateway
+  labels:
+    app.kubernetes.io/name: woo-mcp
+    {{- include "woo-mcp.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: woo-mcp
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.allowedClientLabel | nindent 14 }}
+      ports:
+        - port: {{ .Values.port }}
+          protocol: TCP

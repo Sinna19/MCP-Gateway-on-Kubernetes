@@ -1,6 +1,6 @@
 apiVersion: v2
 name: woo-mcp
-description: woo-mcp subchart (empty placeholder, filled in a later phase)
+description: woo-mcp, the MCP server for the WooCommerce store (ClusterIP only)
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

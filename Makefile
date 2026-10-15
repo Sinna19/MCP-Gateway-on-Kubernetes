@@ -11,9 +11,14 @@ cluster-up:
 cluster-down:
 	scripts/cluster-down.sh
 
-# Build service images and import them into k3d. Nothing to build until Phase 2.
+# Tag = hash of the service directory in git, so it changes only when the service changes.
+# Commit service changes before `make deploy`, or the tag (and the running pod) stays the same.
+WOO_MCP_TAG := $(shell git rev-parse --short HEAD:services/woo-mcp)
+
+# Build service images and import them into k3d (cached builds are fast).
 images:
-	@echo "images: no services yet"
+	docker build -q -t urumi/woo-mcp:$(WOO_MCP_TAG) services/woo-mcp
+	k3d image import -c urumi urumi/woo-mcp:$(WOO_MCP_TAG)
 
 deps:
 	helm dependency update charts/platform >/dev/null
@@ -21,8 +26,9 @@ deps:
 secrets:
 	scripts/secrets.sh
 
-deploy: deps secrets
-	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml
+deploy: deps secrets images
+	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml \
+	  --set woo-mcp.image.tag=$(WOO_MCP_TAG)
 	scripts/wait-setup.sh
 
 # Prints failures only, then a one-line summary. eslint/tsc get added with the first TS service.

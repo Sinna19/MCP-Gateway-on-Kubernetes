@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: woo-mcp
+  labels:
+    app.kubernetes.io/name: woo-mcp
+    {{- include "woo-mcp.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: woo-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: woo-mcp
+        {{- include "woo-mcp.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: woo-mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.port | quote }}
+            - name: WOO_URL
+              value: {{ .Values.wooUrl | quote }}
+            - name: WOO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: username
+            # Waits in CreateContainerConfigError until the store setup Job adds this key.
+            - name: WOO_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: password
+          # The process is up. Does not depend on WordPress, so a store outage never restarts us.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          # Calls WooCommerce with our credentials, so we leave the Service until the store answers.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 12
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
