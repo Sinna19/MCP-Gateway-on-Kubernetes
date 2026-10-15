@@ -21,5 +21,6 @@ The database is part of the gateway's state, so one chart owns it, and a separat
 ## Consequences
 
 - A row can be lost while Postgres is down. In that window `/readyz` fails and the pod leaves the Service, so the gap is short. If the audit trail ever must be complete, the alternative is to write a "started" row before the call; that is not done now.
+- Postgres restart: `createPool` logs idle-client errors instead of crashing. Deleting `gateway-postgres-0` gave login 200 again 8s after the delete (no gateway restart); `/readyz` fails meanwhile, so the pod leaves the Service.
 - No Postgres backups yet (Phase 8). Gateway ingress is not yet limited to Traefik (Phase 7).
 - Each rollout drops open `/mcp` sessions; clients re-initialise.
