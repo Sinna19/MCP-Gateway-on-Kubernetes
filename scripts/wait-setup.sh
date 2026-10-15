@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Waits for the newest store setup Job. Succeeds when it completes; on failure or timeout prints its last
-# 20 log lines and exits 1. `make deploy` runs this, so a failed setup fails the deploy, and a second
-# deploy cannot start while the first Job is still running. See ADR 004.
+# Waits for the store setup Job of the current release revision (setup-<revision>), never a leftover older
+# one. Succeeds when it completes; on failure or timeout prints its last 20 log lines and exits 1.
+# `make deploy` runs this, so a failed setup fails the deploy. See ADR 004.
 set -euo pipefail
 
 NS="${NS:-urumi}"
+RELEASE="${RELEASE:-platform}"
 TIMEOUT="${TIMEOUT:-10m}"
 
-job="$(kubectl -n "$NS" get jobs -l app.kubernetes.io/name=setup --sort-by=.metadata.creationTimestamp -o name | tail -1)"
-[ -n "$job" ] || { echo "wait-setup: no setup job found"; exit 1; }
+revision="$(helm status "$RELEASE" -n "$NS" -o json | jq -r .version | tr -d '\r')"
+job="job/setup-$revision"
+kubectl -n "$NS" get "$job" -o name >/dev/null 2>&1 || { echo "wait-setup: $job not found"; exit 1; }
 echo "wait-setup: waiting for $job"
 
 # Wait for "complete" and "failed" at the same time, so a crashing Job fails fast instead of at the timeout.

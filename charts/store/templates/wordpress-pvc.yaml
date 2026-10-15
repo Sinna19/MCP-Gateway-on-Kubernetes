@@ -2,6 +2,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: store-wordpress-content
+  annotations:
+    # Same as the MariaDB volume: uninstalling the chart must not delete data (and leave the two out of sync).
+    helm.sh/resource-policy: keep
   labels:
     app.kubernetes.io/name: wordpress
     {{- include "store.labels" . | nindent 4 }}

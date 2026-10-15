@@ -95,21 +95,30 @@ SA=/var/run/secrets/kubernetes.io/serviceaccount
 SECRET_URL="https://kubernetes.default.svc/api/v1/namespaces/$(cat $SA/namespace)/secrets/$API_SECRET"
 kube() { curl -sS --fail-with-body --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat $SA/token)" "$@"; }
 
+# uuids of our application passwords, one per line. JSON rather than CSV, so a comma in a name cannot misparse.
 # shellcheck disable=SC2016  # the $ signs are PHP variables, not shell
+app_password_uuids() {
+  wp user application-password list "$INTEGRATION_USER" --fields=uuid,name --format=json |
+    php -r 'foreach (json_decode(stream_get_contents(STDIN), true) ?: [] as $p) { if ($p["name"] === getenv("INTEGRATION_USER")) echo $p["uuid"], PHP_EOL; }'
+}
+
+# shellcheck disable=SC2016
 current="$(kube "$SECRET_URL" | php -r '$d = json_decode(stream_get_contents(STDIN), true); echo $d["data"]["password"] ?? "";')"
-if [ -n "$current" ]; then
+existing="$(app_password_uuids)"
+# Skip only if the Secret has a password AND WordPress still has the matching application password. If the
+# database was lost but the Secret survived, the stored password is dead, so make a new one.
+if [ -n "$current" ] && [ -n "$existing" ]; then
   log "secret $API_SECRET: password already set, skipped"
 else
   # Drop any application password of ours (a previous run may have died before patching the Secret).
-  wp user application-password list "$INTEGRATION_USER" --fields=uuid,name --format=csv | tail -n +2 |
-    while IFS=, read -r uuid name; do
-      if [ "$name" = "$INTEGRATION_USER" ]; then
-        wp user application-password delete "$INTEGRATION_USER" "$uuid" >/dev/null
-      fi
-    done
+  for uuid in $existing; do
+    wp user application-password delete "$INTEGRATION_USER" "$uuid" >/dev/null
+  done
   app_password="$(wp user application-password create "$INTEGRATION_USER" "$INTEGRATION_USER" --porcelain)"
-  # Body goes in on stdin so the password never shows up in a process list.
-  printf '{"data":{"password":"%s"}}' "$(printf %s "$app_password" | base64 | tr -d '\n')" |
+  # The body goes in on stdin, so the app password stays out of argv (and the process list). Other secrets do
+  # not: the admin password is an argument to wp above, and the ServiceAccount token is one to curl.
+  printf '{"data":{"password":"%s"}}' "$(printf %s "$app_password" | base64 | tr -d '
+')" |
     kube -X PATCH -H 'Content-Type: application/merge-patch+json' --data-binary @- "$SECRET_URL" >/dev/null
   log "secret $API_SECRET: password written"
 fi

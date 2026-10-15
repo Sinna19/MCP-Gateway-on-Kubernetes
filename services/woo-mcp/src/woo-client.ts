@@ -48,10 +48,15 @@ export function createWooClient(opts: WooClientOptions): WooClient {
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(opts.timeoutMs),
+        // A redirect would replay the Authorization header and can turn a POST into a GET.
+        redirect: "error",
       });
     } catch (err) {
       if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
         throw new WooError(`WooCommerce request timed out after ${opts.timeoutMs}ms`);
+      }
+      if (err instanceof Error && err.cause instanceof Error && err.cause.message === "unexpected redirect") {
+        throw new WooError("WooCommerce redirected the request; check WOO_URL");
       }
       throw new WooError(`Could not reach WooCommerce: ${err instanceof Error ? err.message : String(err)}`);
     }

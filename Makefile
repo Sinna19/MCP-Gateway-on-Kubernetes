@@ -3,6 +3,7 @@ NS := urumi
 CHARTS := store woo-mcp gateway upstreams platform
 TS_SERVICES := woo-mcp
 
+.NOTPARALLEL:
 .PHONY: cluster-up cluster-down images deps secrets deploy lint test dod
 
 cluster-up:
@@ -37,7 +38,9 @@ lint: deps
 	for c in $(CHARTS); do \
 	  out=$$(helm lint charts/$$c -f deploy/values-local.yaml --set image.tag=lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
-	out=$$(helm template platform charts/platform -f deploy/values-local.yaml --set woo-mcp.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
+	for v in local prod; do \
+	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
+	done; \
 	for s in $(TS_SERVICES); do \
 	  out=$$(npm --prefix services/$$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \

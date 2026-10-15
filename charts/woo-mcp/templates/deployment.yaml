@@ -16,10 +16,13 @@ spec:
         app.kubernetes.io/name: woo-mcp
         {{- include "woo-mcp.labels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: woo-mcp
           image: "{{ .Values.image.repository }}:{{ required "image.tag must be set; use make deploy" .Values.image.tag }}"

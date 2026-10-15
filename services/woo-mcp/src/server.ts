@@ -6,6 +6,8 @@ import type { WooClient } from "./woo-client.js";
 
 const MAX_BODY_BYTES = 1_000_000;
 
+class BodyTooLarge extends Error {}
+
 function readJson(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -13,8 +15,9 @@ function readJson(req: IncomingMessage): Promise<unknown> {
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        reject(new Error("body too large"));
-        req.destroy();
+        // Keep the socket open long enough to send the 413; the rest of the body is read and thrown away.
+        reject(new BodyTooLarge());
+        req.resume();
         return;
       }
       chunks.push(chunk);
@@ -43,8 +46,9 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse, woo: WooClie
   let body: unknown;
   try {
     body = await readJson(req);
-  } catch {
-    send(res, 400, "invalid JSON body");
+  } catch (err) {
+    if (err instanceof BodyTooLarge) send(res, 413, "body too large");
+    else send(res, 400, "invalid JSON body");
     return;
   }
   const server = new McpServer({ name: "woo-mcp", version: "0.1.0" });
@@ -59,7 +63,7 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse, woo: WooClie
 }
 
 export function createHttpServer(deps: { woo: WooClient }): Server {
-  return createServer((req, res) => {
+  const server = createServer((req, res) => {
     const path = (req.url ?? "").split("?")[0];
     if (path === "/healthz") return send(res, 200, "ok");
     if (path === "/readyz") {
@@ -79,4 +83,8 @@ export function createHttpServer(deps: { woo: WooClient }): Server {
     }
     send(res, 404, "not found");
   });
+  // Node's defaults allow a client to hold a socket open for 5 minutes (slowloris).
+  server.requestTimeout = 15_000;
+  server.headersTimeout = 10_000;
+  return server;
 }

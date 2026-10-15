@@ -60,6 +60,19 @@ describe("http server", () => {
     expect((await fetch(`${base}/readyz`)).status).toBe(503);
   });
 
+  it("rejects an oversized body with 413", async () => {
+    const base = await start(vi.fn());
+    const big = JSON.stringify({ pad: "x".repeat(1_100_000) });
+    const res = await fetch(`${base}/mcp`, { method: "POST", body: big });
+    expect(res.status).toBe(413);
+  });
+
+  it("sets request and header timeouts", async () => {
+    await start(vi.fn());
+    expect(server!.requestTimeout).toBe(15_000);
+    expect(server!.headersTimeout).toBe(10_000);
+  });
+
   it("returns 404 for unknown paths and 405 for GET /mcp", async () => {
     const base = await start(vi.fn());
     expect((await fetch(`${base}/nope`)).status).toBe(404);

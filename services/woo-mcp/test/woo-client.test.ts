@@ -16,6 +16,16 @@ function client(fetchImpl: typeof fetch, timeoutMs = 1000) {
 }
 
 describe("woo client", () => {
+  it("does not follow redirects and says what to check", async () => {
+    // Node's fetch rejects with TypeError("fetch failed") whose cause is "unexpected redirect".
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError("fetch failed", { cause: new Error("unexpected redirect") }));
+    const promise = client(fetchMock).request("GET", "/products");
+    await expect(promise).rejects.toThrow(new WooError("WooCommerce redirected the request; check WOO_URL"));
+    expect(fetchMock.mock.calls[0]![1].redirect).toBe("error");
+  });
+
   it("builds the v3 url, query string and basic auth header", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, [{ id: 1 }]));
     const out = await client(fetchMock).request("GET", "/products", { query: { per_page: 5, search: "mug" } });

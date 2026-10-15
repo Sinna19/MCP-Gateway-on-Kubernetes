@@ -17,8 +17,11 @@ spec:
         app.kubernetes.io/name: mariadb
         {{- include "store.labels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: mariadb
           image: {{ .Values.mariadb.image }}

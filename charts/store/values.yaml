@@ -1,6 +1,6 @@
 # store subchart values. global.* comes from the umbrella chart (deploy/values-*.yaml).
 mariadb:
-  image: mariadb:11.4
+  image: mariadb:11.4.13
   database: wordpress
   user: wordpress
   # Secret is created by scripts/secrets.sh, never by Helm (ADR 002).
@@ -41,13 +41,14 @@ wordpress:
 
 setup:
   # Only provides the wp binary. Core comes from wordpress.image, so the version always matches (ADR 003).
-  cliImage: wordpress:cli-php8.3
+  cliImage: wordpress:cli-2.12.0-php8.3
   woocommerceVersion: "11.2.1"
   siteTitle: Urumi Store
   adminEmail: admin@example.com
   # Created empty by scripts/secrets.sh (key username); the Job adds key password.
   apiSecret: woo-api
   integrationUser: woo-mcp
+  # Names must not contain "|": the setup script reads each product as a "sku|price|name" line.
   products:
     - { name: "Classic T-Shirt", sku: "TSHIRT-001", price: "19.99" }
     - { name: "Coffee Mug", sku: "MUG-001", price: "9.50" }

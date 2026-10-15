@@ -19,8 +19,11 @@ spec:
         app.kubernetes.io/name: wordpress
         {{- include "store.labels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsUser: 33
+        seccompProfile:
+          type: RuntimeDefault
         runAsGroup: 33
         runAsNonRoot: true
         fsGroup: 33
