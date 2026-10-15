@@ -14,3 +14,4 @@ paths:
 - k3d needs `k3d image import` for local images and `imagePullPolicy: IfNotPresent`.
 - Traefik must not buffer SSE responses on `/mcp`.
 - Quiet output: `helm template ... | grep -A3 <thing>` instead of dumping full renders; `kubectl get -o name`; `kubectl logs --tail=50`; `kubectl describe` piped through `sed -n '/Events/,$p'` when you only need events.
+- Windows Git Bash: prefix `kubectl exec ... -- /path` with `MSYS_NO_PATHCONV=1` (otherwise `/var/...` becomes a Windows path). Python `open().write()` writes CRLF; strip with `sed -i 's/\r$//'`. After a Docker restart, if `kubectl` is refused, check `netsh interface ipv4 show excludedportrange protocol=tcp` (ADR 001).
