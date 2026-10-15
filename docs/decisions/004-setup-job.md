@@ -45,3 +45,9 @@ So `scripts/secrets.sh` creates `woo-api` first, with only the key `username`. T
 - No probes on the Job (it is run-to-completion). It has requests/limits plus a deadline and backoff limit.
 - Rotating the integration credential: patch `woo-api` to remove `password`, then `helm upgrade`.
 - Wiping the cluster also loses `woo-api`; `make secrets` recreates it empty and the Job refills it.
+
+## Recovery
+If the setup Job regenerates the `woo-api` password (for example after the WordPress database was lost, or
+after you removed `password` from the Secret), run `kubectl -n urumi rollout restart deploy/woo-mcp`. The
+password is an env var, which the container reads only at startup, so the running pod keeps the old one and
+stays NotReady (its `/readyz` gets 401s) until it restarts.
