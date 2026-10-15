@@ -81,6 +81,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 ## Phase 8: VPS (k3s)
 - [ ] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
 - [ ] Secrets created on the server via script, never committed
+- [ ] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use
+- [ ] VPS is single-node: setup Job and WordPress share an RWO PVC; say so in README (podAffinity if ever multi-node)
 - [ ] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
 - **Accept:** DoD flow works at the public hostname; README lists exactly what differs from local.
 

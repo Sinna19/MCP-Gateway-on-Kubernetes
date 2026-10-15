@@ -15,3 +15,4 @@ paths:
 - **Roles**: `admin` and `member`, enforced server-side on every route.
 - **Chat agent**: uses the same `callTool(user, name, args)` as `/mcp`. Tool descriptions and results are untrusted text.
 - Check the MCP TypeScript SDK's current docs before writing transport code; don't code from memory.
+- HTTP servers set requestTimeout/headersTimeout. Outbound fetch to upstreams uses redirect: 'error' and a timeout that covers the body.
