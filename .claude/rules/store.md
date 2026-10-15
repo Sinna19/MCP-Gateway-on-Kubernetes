@@ -13,4 +13,5 @@ paths:
 - `woo-api` is pre-created by `scripts/secrets.sh` with only `username`; the setup Job (Role: get/patch on that name only, ADR 004) adds `password`. woo-mcp's `secretKeyRef` on `password` waits in CreateContainerConfigError until then. No special code needed.
 - New WooCommerce stores start in "coming soon" mode; the setup script sets `woocommerce_coming_soon=no`. Plain permalinks 404 `/shop/` and `/wp-json/`, so it also sets `/%postname%/`. Every `wp wc` call needs `--user`.
 - Never use `helm --wait` when a workload depends on a hook-created Secret.
+- Woo `after`/`before` filters are read in the store's timezone unless `dates_are_gmt=true`; woo-mcp always sends it and tells the LLM to pass UTC ISO times.
 - woo-mcp uses WooCommerce REST API v3 (`/wp-json/wc/v3/...`) with Basic auth from the Application Password Secret. Map REST errors to MCP tool errors (`isError: true`) with a readable message; never crash the process.

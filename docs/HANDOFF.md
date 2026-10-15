@@ -1,17 +1,19 @@
 # Handoff
 
-- **Done this session:** Phase 1 is complete and its Accept line is ticked.
-  - 2a49fb6 fix(cluster): pin k3d API port to 6550 (random port hit a Windows reserved range; ADR 001).
-  - 43c4997 feat(store): setup Job, scoped RBAC (get/patch on `woo-api` only), pre-created `woo-api`, ADR 004.
-  - 5c75323 chore(store): shellcheck SC2016 silenced for the php snippet.
-  - 2573177 docs: tick phase 1 accept. 0d13b20 feat(store): make shop the front page.
-  - Verified: COD order 14 is `processing` and survived deleting the WordPress and MariaDB pods; `setup-4` logged "front page: already set, skipped"; `/` returns 200 with 3 products; REST v3 lists 3 SKUs with the `woo-mcp` app password; `shellcheck` and `make lint` clean.
-- **In progress:** nothing. Working tree is clean.
-- **Next step:** `2 woo-mcp service` (TS service, Streamable HTTP `/mcp`, `/healthz`, `/readyz`, the 5 tools). Big task, so use plan mode.
+- **Done this session:** Phase 2a, the woo-mcp service and its tests.
+  - c45cce0 feat(woo-mcp): `services/woo-mcp` with client, 5 tools, stateless Streamable HTTP `/mcp`, `/healthz`, `/readyz`. 28 vitest tests. `make test` and `make lint` now loop over `TS_SERVICES` in the Makefile.
+  - `list_orders` always sends `dates_are_gmt=true` (after/before are read as UTC), covered by a test.
+  - Verified: `make test` -> `test: ok`, `make lint` -> `lint: ok`. Local smoke with a dead Woo URL: `/healthz` 200, `/readyz` 503, curl `tools/list` shows 5 tools, `get_order` returns `isError:true` "Could not reach WooCommerce".
+  - Plan was approved with the split: 2a service, 2b chart and cluster (plan file: `~/.claude/plans/2-generic-barto.md`).
+- **In progress:** nothing in code. `docs/PLAN.md` is edited but NOT committed: Phase 2 items 1 to 3 ticked by me, plus your own GitHub Actions CI line in Phase 9. Commit it with the 2b work.
+- **Next step:** `2b woo-mcp image, chart, NetworkPolicy, ADR 005, cluster accept`
+  - Dockerfile (multi-stage `node:24-alpine`, `USER node`, port 3000), `make images` build + `k3d image import`.
+  - `charts/woo-mcp`: Deployment (secretKeyRef `woo-api` `username`/`password`, `WOO_URL=http://store-wordpress`, probes, limits, non-root, read-only rootfs), ClusterIP Service, NetworkPolicy from `app.kubernetes.io/name=gateway`.
+  - ADR 005 (REST + Application Password vs WP-CLI vs DB). If readiness fails after the NetworkPolicy, check whether k3s blocks kubelet probes, and record the result in the ADR.
+  - Run the Phase 2 Accept checks and tick the last two boxes.
 - **Gotchas learned:**
-  - After any cluster-down, run `make secrets` before `make deploy`. It recreates `woo-api` empty and the Job refills it.
-  - Windows path, CRLF and reserved-port tips are now in `.claude/rules/kubernetes.md`. `git status` can show stale "M" files after a VS Code restart; `git update-index --refresh` and a diff settle it.
-  - `values-prod.yaml` keeps `environmentType: local` while TLS is off, because Application Passwords need HTTPS in production mode.
-  - woo-mcp will use the `woo-api` Secret keys `username` and `password`, and Woo URL `http://store-wordpress` in-cluster (check the Service name in `wordpress-service.yaml`). Permalinks are pretty, so `/wp-json/wc/v3/` works.
-  - Admin login is in Secret `store-wp-admin` (user `admin`). Products: TSHIRT-001, MUG-001, TOTE-001.
-- **Files the next task needs:** CLAUDE.md, docs/PLAN.md (Phase 2), `.claude/rules/store.md`, `.claude/rules/kubernetes.md`, `docs/decisions/004-setup-job.md`, `charts/store/templates/wordpress-service.yaml`, `charts/store/values.yaml` (`setup:` block).
+  - Reading `node_modules` is denied by the harness, so SDK APIs were used from knowledge and confirmed by `tsc` and tests. Imports used: `server/mcp.js`, `server/streamableHttp.js`, `inMemory.js`, `client/streamableHttp.js`.
+  - Big multi-file Bash heredocs failed with "unexpected EOF". Use the Write tool for files.
+  - SDK 1.32.1 with zod 4.6.7 and `z.iso.datetime()` works. TypeScript pinned to 5.9.3 on purpose (latest 7.x untested with typescript-eslint).
+  - Stateless mode uses `enableJsonResponse: true`, so replies are plain JSON, not SSE. The gateway client must send `Accept: application/json, text/event-stream`.
+- **Files the next task needs:** CLAUDE.md, docs/PLAN.md (Phase 2), `.claude/rules/kubernetes.md`, `charts/woo-mcp/{Chart.yaml,values.yaml}`, `charts/store/templates/wordpress-deployment.yaml` (probe and securityContext pattern), `charts/store/templates/_helpers.tpl`, `Makefile` (`images`), `docs/decisions/000-template.md`.
