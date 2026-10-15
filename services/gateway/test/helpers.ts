@@ -16,6 +16,17 @@ export async function createTestDb(): Promise<{ pool: pg.Pool; drop: () => Promi
     pool,
     drop: async () => {
       await pool.end();
+      // pool.end() can resolve before Postgres has noticed the sockets closing. FORCE would kill those
+      // backends and the client emits an unhandled 57P01, so wait for them to leave and use FORCE last.
+      for (let i = 0; i < 20; i++) {
+        try {
+          await admin.query(`DROP DATABASE ${name}`);
+          return await admin.end();
+        } catch (err) {
+          if ((err as { code?: string }).code !== "55006") throw err;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
       await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
       await admin.end();
     },
