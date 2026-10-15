@@ -1,8 +1,10 @@
 import express, { Router } from "express";
 import type pg from "pg";
+import { auditRoutes } from "./audit.js";
 import { authRoutes } from "./auth.js";
 import { apiErrors } from "./errors.js";
 import { inviteRoutes } from "./invites.js";
+import { keyRoutes } from "./keys.js";
 import { memberRoutes } from "./members.js";
 import { loadUser, requireJsonBody } from "./middleware.js";
 import { serverRoutes } from "./servers.js";
@@ -22,6 +24,8 @@ export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure 
   router.use(authRoutes(pool, cookieSecure));
   router.use(inviteRoutes(pool, cookieSecure));
   router.use(memberRoutes(pool));
+  router.use(keyRoutes(pool));
+  router.use(auditRoutes(pool));
   router.use(serverRoutes(pool, upstreams, credentialsKey));
   router.use((_req, res) => void res.status(404).json({ error: "not found" }));
   router.use(apiErrors);
