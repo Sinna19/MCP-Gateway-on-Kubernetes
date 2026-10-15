@@ -53,6 +53,11 @@ fi
 if kubectl -n "$NS" get secret gateway-db >/dev/null 2>&1; then
   echo "secret gateway-db: exists, skipped"
 else
+  # A new random password would not match a database that already initialised with the lost one.
+  if kubectl -n "$NS" get pvc data-gateway-postgres-0 >/dev/null 2>&1; then
+    echo "gateway-db is missing but PVC data-gateway-postgres-0 exists: a new password would not match the initialised database. Restore the Secret, or delete the PVC to start fresh." >&2
+    exit 1
+  fi
   kubectl -n "$NS" create secret generic gateway-db \
     --from-literal=password="$(openssl rand -hex 16)" >/dev/null
   echo "secret gateway-db: created"

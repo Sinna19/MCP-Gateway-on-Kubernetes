@@ -33,6 +33,8 @@ secrets:
 deploy: deps secrets images
 	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml \
 	  --set woo-mcp.image.tag=$(WOO_MCP_TAG) --set gateway.image.tag=$(GATEWAY_TAG)
+	kubectl -n $(NS) rollout status statefulset/gateway-postgres --timeout=180s
+	kubectl -n $(NS) rollout status deploy/gateway --timeout=180s
 	scripts/wait-setup.sh
 
 # Prints failures only, then a one-line summary. eslint/tsc get added with the first TS service.
