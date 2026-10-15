@@ -84,6 +84,7 @@ SA=/var/run/secrets/kubernetes.io/serviceaccount
 SECRET_URL="https://kubernetes.default.svc/api/v1/namespaces/$(cat $SA/namespace)/secrets/$API_SECRET"
 kube() { curl -sS --fail --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat $SA/token)" "$@"; }
 
+# shellcheck disable=SC2016  # the $ signs are PHP variables, not shell
 current="$(kube "$SECRET_URL" | php -r '$d = json_decode(stream_get_contents(STDIN), true); echo $d["data"]["password"] ?? "";')"
 if [ -n "$current" ]; then
   log "secret $API_SECRET: password already set, skipped"
