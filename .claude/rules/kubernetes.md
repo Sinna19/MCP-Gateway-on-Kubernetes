@@ -15,3 +15,5 @@ paths:
 - Traefik must not buffer SSE responses on `/mcp`.
 - Quiet output: `helm template ... | grep -A3 <thing>` instead of dumping full renders; `kubectl get -o name`; `kubectl logs --tail=50`; `kubectl describe` piped through `sed -n '/Events/,$p'` when you only need events.
 - Windows Git Bash: prefix `kubectl exec ... -- /path` with `MSYS_NO_PATHCONV=1` (otherwise `/var/...` becomes a Windows path). Python `open().write()` writes CRLF; strip with `sed -i 's/\r$//'`. After a Docker restart, if `kubectl` is refused, check `netsh interface ipv4 show excludedportrange protocol=tcp` (ADR 001).
+- k3s NetworkPolicy (kube-router) REJECTS blocked traffic: curl gets "connection refused" (exit 7), not a timeout (28). Prove a deny test with a labelled control pod that succeeds, and wait for the test pod to be Ready plus ~10s first (new pod IPs are refused until the policy syncs).
+- Image tags come from `git rev-parse HEAD:services/<name>` (Makefile). Commit service changes before `make deploy` or the pod keeps the old image.
