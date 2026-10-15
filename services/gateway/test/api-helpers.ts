@@ -3,8 +3,9 @@ import { EventEmitter } from "node:events";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type pg from "pg";
-import { createApp, type App } from "../src/app.js";
+import { createApp, type App, type AppOptions } from "../src/app.js";
 import { hashPassword } from "../src/passwords.js";
+import type { ServerStatus } from "../src/upstreams.js";
 
 // Generated per run, so no password is written in the source.
 export const PASSWORD = randomBytes(12).toString("hex");
@@ -22,8 +23,12 @@ export function emptyUpstreams() {
   return Object.assign(new EventEmitter(), {
     tools: () => [],
     callTool: async () => ({ content: [] }),
+    reload: async () => undefined,
+    statuses: (): ServerStatus[] => [],
   });
 }
+
+export const CREDENTIALS_KEY = randomBytes(32);
 
 export interface TestServer {
   app: App;
@@ -31,8 +36,8 @@ export interface TestServer {
   stop: () => Promise<void>;
 }
 
-export async function startServer(pool: pg.Pool, upstreams: ReturnType<typeof emptyUpstreams> = emptyUpstreams()): Promise<TestServer> {
-  const app = createApp({ pool, upstreams });
+export async function startServer(pool: pg.Pool, upstreams: AppOptions["upstreams"] = emptyUpstreams()): Promise<TestServer> {
+  const app = createApp({ pool, upstreams, credentialsKey: CREDENTIALS_KEY });
   const http = await new Promise<Server>((resolve) => {
     const s = app.express.listen(0, "127.0.0.1", () => resolve(s));
   });

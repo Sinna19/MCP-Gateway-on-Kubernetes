@@ -3,10 +3,12 @@ import type pg from "pg";
 import { Gateway, type ToolBackend } from "./gateway.js";
 import { createApiRouter } from "./api/router.js";
 import { createMcpEndpoint } from "./mcp-endpoint.js";
+import type { UpstreamControl } from "./upstreams.js";
 
 export interface AppOptions {
   pool: pg.Pool;
-  upstreams: ToolBackend & { on(event: "toolsChanged", listener: () => void): unknown };
+  upstreams: ToolBackend & UpstreamControl & { on(event: "toolsChanged", listener: () => void): unknown };
+  credentialsKey: Buffer;
   idleMs?: number;
   now?: () => number;
   cookieSecure?: boolean;
@@ -43,7 +45,7 @@ export function createApp(options: AppOptions): App {
     );
   });
   app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
-  app.use("/api", createApiRouter({ pool, cookieSecure: options.cookieSecure ?? false }));
+  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false }));
   app.use(jsonErrors);
 
   return { express: app, gateway, sessionCount: mcp.sessionCount, sweep: mcp.sweep, closeSessions: mcp.closeAll };

@@ -8,6 +8,20 @@ import { isValidToolName, prefixed } from "./tool-names.js";
 
 export type UpstreamStatus = "connected" | "unreachable" | "disabled";
 
+export interface ServerStatus {
+  slug: string;
+  url: string;
+  status: UpstreamStatus;
+  toolCount: number;
+  tools: Array<{ name: string; description: string }>;
+}
+
+// What the admin API needs from the manager (a plain object in tests).
+export interface UpstreamControl {
+  reload(): Promise<void>;
+  statuses(): ServerStatus[];
+}
+
 interface ServerRow {
   slug: string;
   url: string;
@@ -113,8 +127,14 @@ export class UpstreamManager extends EventEmitter {
     }
   }
 
-  statuses(): Array<{ slug: string; url: string; status: UpstreamStatus; toolCount: number }> {
-    return [...this.entries.values()].map((e) => ({ slug: e.row.slug, url: e.row.url, status: e.status, toolCount: e.tools.length }));
+  statuses(): ServerStatus[] {
+    return [...this.entries.values()].map((e) => ({
+      slug: e.row.slug,
+      url: e.row.url,
+      status: e.status,
+      toolCount: e.tools.length,
+      tools: e.tools.map((t) => ({ name: prefixed(e.row.slug, t.name), description: t.description ?? "" })),
+    }));
   }
 
   // Tools of connected upstreams, named "<slug>__<tool>".

@@ -55,9 +55,10 @@ describe("/mcp endpoint", () => {
     };
     alice = await makeUser("alice@x.io");
     bob = await makeUser("bob@x.io");
-    manager = new UpstreamManager({ pool, credentialsKey: randomBytes(32), callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300 });
+    const credentialsKey = randomBytes(32);
+    manager = new UpstreamManager({ pool, credentialsKey, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300 });
     await manager.reload();
-    app = createApp({ pool, upstreams: manager, now: () => clock, idleMs: 30 * 60_000 });
+    app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000 });
     http = await new Promise<Server>((resolve) => {
       const s = app.express.listen(0, "127.0.0.1", () => resolve(s));
     });

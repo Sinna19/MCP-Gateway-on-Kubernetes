@@ -13,7 +13,7 @@ const upstreams = new UpstreamManager({ pool, credentialsKey: config.credentials
 await upstreams.reload();
 upstreams.start();
 
-const app = createApp({ pool, upstreams, cookieSecure: config.cookieSecure });
+const app = createApp({ pool, upstreams, credentialsKey: config.credentialsKey, cookieSecure: config.cookieSecure });
 const server = app.express.listen(config.port, () => console.log(`gateway listening on :${config.port}`));
 // Node's defaults allow a client to hold a socket open for 5 minutes (slowloris).
 server.requestTimeout = 15_000;
