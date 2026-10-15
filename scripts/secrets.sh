@@ -48,3 +48,25 @@ else
   kubectl -n "$NS" create secret generic woo-api --from-literal=username=woo-mcp >/dev/null
   echo "secret woo-api: created"
 fi
+
+# Gateway Postgres password. Hex so it is safe inside DATABASE_URL.
+if kubectl -n "$NS" get secret gateway-db >/dev/null 2>&1; then
+  echo "secret gateway-db: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic gateway-db \
+    --from-literal=password="$(openssl rand -hex 16)" >/dev/null
+  echo "secret gateway-db: created"
+fi
+
+# Gateway app secrets: AES key for upstream credentials (32 bytes, base64) and the bootstrap admin login.
+# Read the admin password with:
+#   kubectl -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d
+if kubectl -n "$NS" get secret gateway-app >/dev/null 2>&1; then
+  echo "secret gateway-app: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic gateway-app \
+    --from-literal=credentials-key="$(openssl rand -base64 32)" \
+    --from-literal=admin-email=admin@urumi.local \
+    --from-literal=admin-password="$(openssl rand -hex 16)" >/dev/null
+  echo "secret gateway-app: created"
+fi
