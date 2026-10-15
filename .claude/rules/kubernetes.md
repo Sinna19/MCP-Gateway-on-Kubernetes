@@ -18,3 +18,5 @@ paths:
 - k3s NetworkPolicy (kube-router) REJECTS blocked traffic: curl gets "connection refused" (exit 7), not a timeout (28). Prove a deny test with a labelled control pod that succeeds, and wait for the test pod to be Ready plus ~10s first (new pod IPs are refused until the policy syncs).
 - Image tags come from `git rev-parse HEAD:services/<name>` (Makefile). Commit service changes before `make deploy` or the pod keeps the old image.
 - Windows `jq -r` ends lines with CR; pipe through `tr -d '\r'` (e.g. `helm status -o json | jq -r .version | tr -d '\r'`).
+- Traefik keeps idle backend connections 90s: Node servers behind it need `keepAliveTimeout` above that (gateway uses 95s) or you get sporadic 502s. SIGTERM: drain 10s, then `closeAllConnections()`, with `terminationGracePeriodSeconds` above that.
+- Shell polling without `sleep` (blocked in Git Bash): `read -t 1 <> <(:) || true`. The `/api/servers` status values are lowercase (`connected`, `unreachable`).

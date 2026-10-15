@@ -43,8 +43,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept:** MCP Inspector via `kubectl port-forward` lists 5 tools; create product shows on storefront; a curl pod without the gateway label is blocked by the NetworkPolicy.
 
 ## Phase 3: Gateway core (3a service + /mcp, 3b REST API, 3c Dockerfile + charts + Accept)
-- [ ] (3a: migrations done, 3c: Postgres chart) Postgres chart + migrations: users, api_keys (hash, prefix, revoked_at), upstream_servers (slug, url, enabled, encrypted credential, header name), audit_log
-- [ ] (3a: bootstrap code done, reads env; 3c: Secret + chart) Bootstrap admin from a Secret on first start; seed woo-mcp as the first registered server
+- [x] (3a: migrations done, 3c: Postgres chart) Postgres chart + migrations: users, api_keys (hash, prefix, revoked_at), upstream_servers (slug, url, enabled, encrypted credential, header name), audit_log
+- [x] (3a: bootstrap code done, reads env; 3c: Secret + chart) Bootstrap admin from a Secret on first start; seed woo-mcp as the first registered server
 - [x] (3a) Upstream manager: one MCP client per enabled upstream, connect with timeout, cached tools, background health check every ~5s, status Connected / Unreachable / Disabled
 - [x] (3a) `/mcp` endpoint: bearer API key auth, `tools/list` aggregates `<slug>__<tool>`, `tools/call` routes, per-call timeout, audit in `finally`, `list_changed` on registry change
 - [x] (3b) REST API for dashboard: auth (session cookie), servers CRUD (admin), members + invites (admin), keys (own; admin can revoke any), audit query
