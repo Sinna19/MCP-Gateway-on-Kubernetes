@@ -1,5 +1,3 @@
-{{- $scheme := ternary "https" "http" .Values.global.ingress.tls }}
-{{- $url := printf "%s://%s.%s" $scheme .Values.wordpress.host .Values.global.domain }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,29 +54,7 @@ spec:
             - name: http
               containerPort: 80
           env:
-            - name: WORDPRESS_DB_HOST
-              value: "store-mariadb:3306"
-            - name: WORDPRESS_DB_NAME
-              value: {{ .Values.mariadb.database | quote }}
-            - name: WORDPRESS_DB_USER
-              value: {{ .Values.mariadb.user | quote }}
-            - name: WORDPRESS_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.mariadb.existingSecret }}
-                  key: password
-            {{- range $env, $key := dict "WORDPRESS_AUTH_KEY" "auth-key" "WORDPRESS_SECURE_AUTH_KEY" "secure-auth-key" "WORDPRESS_LOGGED_IN_KEY" "logged-in-key" "WORDPRESS_NONCE_KEY" "nonce-key" "WORDPRESS_AUTH_SALT" "auth-salt" "WORDPRESS_SECURE_AUTH_SALT" "secure-auth-salt" "WORDPRESS_LOGGED_IN_SALT" "logged-in-salt" "WORDPRESS_NONCE_SALT" "nonce-salt" }}
-            - name: {{ $env }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $.Values.wordpress.existingSaltsSecret }}
-                  key: {{ $key }}
-            {{- end }}
-            # Site URL comes from values so local and prod hosts both work.
-            - name: WORDPRESS_CONFIG_EXTRA
-              value: |
-                define('WP_HOME', '{{ $url }}');
-                define('WP_SITEURL', '{{ $url }}');
+            {{- include "store.wordpressEnv" . | nindent 12 }}
           startupProbe:
             httpGet:
               path: /license.txt

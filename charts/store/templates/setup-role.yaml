@@ -1,0 +1,29 @@
+# get + patch on one Secret by name, nothing else. No "create": RBAC cannot limit create by name, so
+# scripts/secrets.sh creates the Secret and the Job only fills it in (ADR 004).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: store-setup
+  labels:
+    app.kubernetes.io/name: setup
+    {{- include "store.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.setup.apiSecret | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: store-setup
+  labels:
+    app.kubernetes.io/name: setup
+    {{- include "store.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: store-setup
+subjects:
+  - kind: ServiceAccount
+    name: store-setup

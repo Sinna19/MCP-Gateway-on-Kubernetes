@@ -34,3 +34,28 @@ wordpress:
     limits:
       cpu: 1
       memory: 512Mi
+  # "local" lets Application Passwords work over plain HTTP. deploy/values-prod.yaml sets "production".
+  environmentType: local
+  # Created by scripts/secrets.sh. Keys: username, password.
+  existingAdminSecret: store-wp-admin
+
+setup:
+  # Only provides the wp binary. Core comes from wordpress.image, so the version always matches (ADR 003).
+  cliImage: wordpress:cli-php8.3
+  woocommerceVersion: "11.2.1"
+  siteTitle: Urumi Store
+  adminEmail: admin@example.com
+  # Created empty by scripts/secrets.sh (key username); the Job adds key password.
+  apiSecret: woo-api
+  integrationUser: woo-mcp
+  products:
+    - { name: "Classic T-Shirt", sku: "TSHIRT-001", price: "19.99" }
+    - { name: "Coffee Mug", sku: "MUG-001", price: "9.50" }
+    - { name: "Canvas Tote Bag", sku: "TOTE-001", price: "14.00" }
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 512Mi

@@ -27,3 +27,24 @@ else
   kubectl -n "$NS" create secret generic store-wp-salts "${args[@]}" >/dev/null
   echo "secret store-wp-salts: created"
 fi
+
+# WP admin login, used by the setup Job and by you to open WP admin. Read it with:
+#   kubectl -n urumi get secret store-wp-admin -o jsonpath='{.data.password}' | base64 -d
+if kubectl -n "$NS" get secret store-wp-admin >/dev/null 2>&1; then
+  echo "secret store-wp-admin: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic store-wp-admin \
+    --from-literal=username=admin \
+    --from-literal=password="$(openssl rand -hex 16)" >/dev/null
+  echo "secret store-wp-admin: created"
+fi
+
+# woo-api is created here with no password key, so the setup Job's Role can be get/patch on this one
+# name and nothing else (RBAC cannot limit "create" by name). The Job fills in "password". Until then
+# woo-mcp's secretKeyRef on "password" keeps its pod waiting. See ADR 004.
+if kubectl -n "$NS" get secret woo-api >/dev/null 2>&1; then
+  echo "secret woo-api: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic woo-api --from-literal=username=woo-mcp >/dev/null
+  echo "secret woo-api: created"
+fi

@@ -5,3 +5,6 @@ global:
   ingress:
     className: traefik
     tls: false
+# Application Passwords need HTTPS unless WP_ENVIRONMENT_TYPE is "local". Prod stays on "local"
+# (the chart default) while global.ingress.tls is false; set store.wordpress.environmentType to
+# "production" here once TLS is on.
