@@ -1,16 +1,16 @@
 # Handoff
 
-- **Done this session:** Phase 3c steps 0 to 3. `make lint` and `make test` green, `make deploy` green.
-  - dce32ee `test(gateway): drop test DB without FORCE` (plain DROP, retry on 55006, FORCE last; 10x loop of mcp-endpoint.test.ts passed 13/13).
-  - 5ea9785 `feat(gateway): Dockerfile and secrets` (Dockerfile copies `migrations/`; `scripts/secrets.sh` makes `gateway-db`, `gateway-app`).
-  - b7465eb `feat(gateway): chart with Postgres, Ingress, NetworkPolicy` (+ Makefile GATEWAY_TAG).
-  - Live: `gateway` and `gateway-postgres-0` 1/1 Running, log "gateway listening on :8080", `curl http://app.localtest.me/api/servers` gives 401.
-- **In progress:** nothing half-finished; tree clean after this commit. PLAN 3c boxes are NOT ticked yet (Accept not run).
-- **Next step:** `3c Accept + ADR 009`: write `docs/decisions/009-gateway-deployment.md`, run Accept checks 1 to 6 from the plan file `C:\Users\aashi\.claude\plans\3c-dockerfile-charts-glowing-rainbow.md`, tick PLAN 3c, add gotchas to rules.
-  - Accept: curl login + `POST /api/keys` + `tools/list` lists 5 `woo__*`; `claude mcp add` in default local scope (never `-s project`); revoked key 401; `scale deploy/woo-mcp --replicas=0` then poll `/api/servers` for Unreachable (gateway stays Ready), scale back to 1; delete `gateway-postgres-0`, login still works; `timeout 90 curl -N` GET `/mcp` with a session id stays open.
+- **Done this session:** Phase 3c complete, PLAN 3c ticked.
+  - a340a35 `fix(gateway): keep-alive, startupProbe, graceful shutdown` (keepAlive 95s / headers 96s, startupProbe, SIGTERM drains 10s, grace 15s; PLAN phase 7/8 hardening bullets added).
+  - 1fd97bb `docs: ADR 009, tick PLAN 3c` (ADR 009 says audit is best-effort on purpose; gotchas added to rules).
+  - Step 0a: no stale flake note was left in HANDOFF; the flake is fixed in dce32ee.
+  - Accept (real cluster): 1 PASS (login, `POST /api/keys`, `tools/list` shows 5 `woo__*`). 2 PASS (`claude mcp get urumi` Connected, local scope, no `.mcp.json`). 3 PASS (revoked key 200 then 401). 4 PASS (woo `unreachable` at t+5s, `tools/list` 200, gateway Ready, `connected` again after scale to 1). 6 PASS (`timeout 90 curl -N` GET `/mcp`: exit 124 after 91s).
+  - Accept 5 PASS WITH A BUG: after `kubectl delete pod gateway-postgres-0`, login returned 503 for about 40s, then 200 (same admin, so the PVC works). The gateway process crashed and crash-looped on `migrate()` ECONNREFUSED until Postgres was back.
+- **In progress:** nothing half-finished. Tree is clean except untracked `docs/explain/gateway-deployment.md` (not committed).
+- **Next step:** `3c pool error handler`: `services/gateway/src/db.ts:8` `createPool` has no `pool.on("error", ...)`, so an idle-client error (57P01 when Postgres dies) is an unhandled event that kills the process. Test first, then add the handler (log only) and a bounded connect retry around `migrate()` in `src/index.ts:9`. Then re-run Accept 5 and expect no restarts.
 - **Gotchas learned:**
-  - A long `cat > file <<'EOF'` batch in Bash failed to parse and wrote nothing; use the Write tool for chart files.
-  - `cd` in a Bash call moves the working directory for later calls; use `cd /c/Users/aashi/dev/urumi-assignment && ...` or absolute paths.
-  - Gateway Postgres pods are labelled `gateway-postgres`, never `gateway` (the woo-mcp NetworkPolicy allows `name=gateway`). `DB_PASSWORD` must precede `DATABASE_URL` in env. Read the admin password with the command in `scripts/secrets.sh`.
-  - `sleep N` in Bash is blocked; use `kubectl rollout status` or Monitor.
-- **Files the next task needs:** the plan file above, `docs/PLAN.md` (Phase 3 section, lines 45 to 52), `docs/decisions/008-dashboard-auth.md` (ADR style), `.claude/rules/{kubernetes,gateway}.md`, `charts/gateway/templates/{deployment,ingress}.yaml`.
+  - Git Bash blocks `sleep`; poll with `read -t 1 <> <(:) || true`. `/api/servers` status is lowercase (`connected`, `unreachable`), so my first `case` patterns never matched.
+  - Traefik idles backend sockets for 90s, so Node keepAliveTimeout must exceed it (in `.claude/rules/kubernetes.md`). The pool-error gotcha is in `.claude/rules/gateway.md`.
+  - A scripted `initialized` notification needs its URL, or curl errors "no URL specified" (the session still worked).
+  - Scratchpad has `login.json`, `key.txt`, cookie jars (secrets; never print them). The `accept-main` key is still active and is what `claude mcp` uses.
+- **Files the next task needs:** `services/gateway/src/db.ts`, `services/gateway/src/index.ts`, `services/gateway/test/helpers.ts` (test DB patterns), `.claude/rules/gateway.md`.
