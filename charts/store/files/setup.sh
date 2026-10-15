@@ -49,6 +49,17 @@ if [ -z "$(wp option get woocommerce_shop_page_id 2>/dev/null)" ] || [ "$(wp opt
   log "woocommerce pages: created"
 fi
 
+# A fresh WordPress shows the "Hello world!" post on the homepage. Make the Shop page the front page so
+# visitors land on products.
+shop_page_id="$(wp option get woocommerce_shop_page_id)"
+if [ "$(wp option get show_on_front)" = "page" ] && [ "$(wp option get page_on_front)" = "$shop_page_id" ]; then
+  log "front page: already set, skipped"
+else
+  wp option update show_on_front page >/dev/null
+  wp option update page_on_front "$shop_page_id" >/dev/null
+  log "front page: set to shop page $shop_page_id"
+fi
+
 wp wc payment_gateway update cod --enabled=true --user="$WC_USER" >/dev/null
 log "cash on delivery: enabled"
 
