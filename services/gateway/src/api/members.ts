@@ -36,14 +36,43 @@ export function memberRoutes(pool: pg.Pool): Router {
       res.status(400).json({ error: "you cannot demote or disable yourself" });
       return;
     }
-    const result = await pool.query(
-      `UPDATE users SET role = COALESCE($2, role),
-              disabled_at = CASE WHEN $3::boolean IS NULL THEN disabled_at WHEN $3 THEN COALESCE(disabled_at, now()) ELSE NULL END
-        WHERE id = $1`,
-      [id, role ?? null, disabled ?? null],
-    );
-    if (!result.rowCount) {
+    // Two admins can pass the checks above at the same moment and remove each other. The table lock
+    // (same as bootstrap) makes the "is there another enabled admin?" check and the update one step.
+    const client = await pool.connect();
+    let outcome: "ok" | "missing" | "last-admin" = "ok";
+    try {
+      await client.query("BEGIN");
+      await client.query("LOCK TABLE users IN EXCLUSIVE MODE");
+      const target = await client.query("SELECT role, disabled_at IS NOT NULL AS disabled FROM users WHERE id = $1", [id]);
+      if (!target.rowCount) {
+        outcome = "missing";
+      } else {
+        const removesAdmin = target.rows[0].role === "admin" && !target.rows[0].disabled && (role === "member" || disabled === true);
+        const others = removesAdmin ? await client.query("SELECT 1 FROM users WHERE role = 'admin' AND disabled_at IS NULL AND id <> $1", [id]) : null;
+        if (others && !others.rowCount) {
+          outcome = "last-admin";
+        } else {
+          await client.query(
+            `UPDATE users SET role = COALESCE($2, role),
+                    disabled_at = CASE WHEN $3::boolean IS NULL THEN disabled_at WHEN $3 THEN COALESCE(disabled_at, now()) ELSE NULL END
+              WHERE id = $1`,
+            [id, role ?? null, disabled ?? null],
+          );
+        }
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+    if (outcome === "missing") {
       res.status(404).json({ error: "member not found" });
+      return;
+    }
+    if (outcome === "last-admin") {
+      res.status(409).json({ error: "at least one other enabled admin is required" });
       return;
     }
     if (disabled === true) await deleteUserSessions(pool, id);

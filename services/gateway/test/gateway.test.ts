@@ -54,6 +54,15 @@ describe("Gateway.callTool", () => {
     expect(rows[0]).toMatchObject({ server_slug: null, tool: "nodoubleunderscore", outcome: "error", source: "mcp" });
   });
 
+  it("a very long tool name is cut to 100 characters in the audit row and in the error text", async () => {
+    for (const name of ["x".repeat(300), `woo__${"y".repeat(300)}`]) {
+      const result = await gateway.callTool(user, name, {}, "mcp");
+      expect(JSON.stringify(result.content).length).toBeLessThan(200);
+    }
+    const rows = await audit();
+    expect(rows.map((r) => r.tool.length)).toEqual([100, 100]);
+  });
+
   it("an upstream error becomes an error result naming the server, truncated in the audit row", async () => {
     backend.callTool = async () => {
       throw new UpstreamError(`server 'woo' failed: ${"x".repeat(2000)}`);

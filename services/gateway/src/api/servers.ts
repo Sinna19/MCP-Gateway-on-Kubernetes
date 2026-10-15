@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { encrypt } from "../crypto.js";
 import type { ServerStatus, UpstreamControl, UpstreamStatus } from "../upstreams.js";
+import { isBlockedHost } from "../url-guard.js";
 import { currentUser, requireAdmin, requireUser } from "./middleware.js";
 
 interface ServerRow {
@@ -23,7 +24,10 @@ export function serverView(row: ServerRow, live: Pick<ServerStatus, "status" | "
 }
 
 // Headers that would break the HTTP request or that have their own auth type.
-const FORBIDDEN_HEADERS = new Set(["host", "content-length", "cookie", "connection", "transfer-encoding", "authorization"]);
+const FORBIDDEN_HEADERS = new Set([
+  "host", "content-length", "cookie", "connection", "transfer-encoding", "authorization",
+  "content-type", "accept", "mcp-session-id", "mcp-protocol-version", "proxy-authorization", "upgrade", "te",
+]);
 const HEADER_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const VISIBLE_ASCII = /^[\x20-\x7e]+$/; // no CR/LF, so a value can't inject another header
 
@@ -42,29 +46,35 @@ const authBody = z.discriminatedUnion("type", [
   }),
 ]);
 
-const urlBody = z
-  .string()
-  .max(2000)
-  .refine((value) => {
-    try {
-      const u = new URL(value);
-      return (u.protocol === "http:" || u.protocol === "https:") && !u.username && !u.password;
-    } catch {
-      return false;
-    }
-  }, "must be an http(s) URL without a username or password");
+// Registration check only; the manager checks the resolved address again at connect time (url-guard.ts).
+function urlBodyFor(allowLoopback: boolean) {
+  return z
+    .string()
+    .max(2000)
+    .refine((value) => {
+      try {
+        const u = new URL(value);
+        return (u.protocol === "http:" || u.protocol === "https:") && !u.username && !u.password && (allowLoopback || !isBlockedHost(u.hostname));
+      } catch {
+        return false;
+      }
+    }, "must be an http(s) URL without a username or password, and not point at localhost, a loopback or link-local address");
+}
 
-const createBody = z.strictObject({
-  slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(20),
-  url: urlBody,
-  enabled: z.boolean().optional(),
-  auth: authBody.nullable().optional(),
-});
-
-// The slug is not here on purpose: it is the tool prefix and the encryption AAD.
-const patchBody = z
-  .strictObject({ url: urlBody.optional(), enabled: z.boolean().optional(), auth: authBody.nullable().optional() })
-  .refine((b) => b.url !== undefined || b.enabled !== undefined || b.auth !== undefined, { message: "give url, enabled or auth" });
+function bodiesFor(allowLoopback: boolean) {
+  const urlBody = urlBodyFor(allowLoopback);
+  const createBody = z.strictObject({
+    slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(20),
+    url: urlBody,
+    enabled: z.boolean().optional(),
+    auth: authBody.nullable().optional(),
+  });
+  // The slug is not here on purpose: it is the tool prefix and the encryption AAD.
+  const patchBody = z
+    .strictObject({ url: urlBody.optional(), enabled: z.boolean().optional(), auth: authBody.nullable().optional() })
+    .refine((b) => b.url !== undefined || b.enabled !== undefined || b.auth !== undefined, { message: "give url, enabled or auth" });
+  return { createBody, patchBody };
+}
 
 type AuthInput = z.infer<typeof authBody>;
 
@@ -76,8 +86,9 @@ function credentialFor(key: Buffer, slug: string, auth: AuthInput): { headerName
 
 const COLUMNS = "slug, url, enabled, header_name, credential_enc";
 
-export function serverRoutes(pool: pg.Pool, upstreams: UpstreamControl, credentialsKey: Buffer): Router {
+export function serverRoutes(pool: pg.Pool, upstreams: UpstreamControl, credentialsKey: Buffer, allowLoopback = false): Router {
   const router = Router();
+  const { createBody, patchBody } = bodiesFor(allowLoopback);
 
   // One reload after every write: connects new or changed servers, drops removed ones.
   async function viewOf(slug: string, isAdmin: boolean) {

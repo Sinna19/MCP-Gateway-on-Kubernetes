@@ -63,12 +63,14 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] Members page: invite, role, revoke keys; My Keys page: generate (show once), revoke
 - [ ] Audit log: table with user, server, tool, time, duration, outcome, filters
 - [ ] Served by nginx in-cluster; Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway, `/` to dashboard
+- [ ] Ingress paths (`/api`, `/mcp`, `/`) come from values, not hardcoded in the template
 - **Accept:** a member cannot reach admin pages or admin API routes (API test, not just UI); credentials never appear in browser network tab.
 
 ## Phase 6: Chat agent
 - [ ] Backend endpoint `/api/chat`: LLM call with tools from the user's view of the gateway, loop until no tool calls (max N steps), each call through the same `callTool(user, name, args)` used by `/mcp`, audit `source=chat`
 - [ ] UI shows each tool call (name, args, result summary)
 - [ ] Treat tool descriptions and results as untrusted text in the system prompt
+- [ ] Cap the length of upstream tool descriptions before they go into the LLM prompt
 - **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
 
 ## Phase 7: DoD run + hardening
@@ -81,6 +83,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] woo-mcp hop token (gateway sends it as an upstream credential)
 - [ ] CREDENTIALS_KEY rotation (re-encrypt stored credentials)
 - [ ] Throttle `api_keys.last_used_at` writes
+- [ ] `/mcp` session cap per key, and sweep sessions whose `initialize` failed
+- [ ] Gateway egress NetworkPolicy: only Postgres, upstream pods, DNS and the LLM endpoint (closes the SSRF gap in ADR 009)
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster.
 
 ## Phase 8: VPS (k3s)

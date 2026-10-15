@@ -39,6 +39,12 @@ describe("bootstrap", () => {
     expect(servers.rows).toEqual([{ slug: "woo", url: "http://woo-mcp:3000/mcp", enabled: true, credential_enc: null }]);
   });
 
+  it("stores the admin email trimmed and lowercase, and the database refuses a case-variant duplicate", async () => {
+    await bootstrap(pool, { ...options, adminEmail: " Admin@X.io " });
+    expect((await pool.query("SELECT email FROM users")).rows).toEqual([{ email: "admin@x.io" }]);
+    await expect(pool.query("INSERT INTO users (email, role, password_hash) VALUES ('ADMIN@x.io', 'member', 'x')")).rejects.toMatchObject({ code: "23505", constraint: "users_email_lower" });
+  });
+
   it("running twice changes nothing", async () => {
     await bootstrap(pool, options);
     await bootstrap(pool, { ...options, adminPassword: "different" });

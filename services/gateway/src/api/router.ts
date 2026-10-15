@@ -15,10 +15,11 @@ export interface ApiOptions {
   upstreams: UpstreamControl;
   credentialsKey: Buffer;
   cookieSecure: boolean;
+  allowLoopback?: boolean; // tests only
 }
 
 // Everything under /api: JSON only, session cookie auth, one error handler at the end.
-export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure }: ApiOptions): Router {
+export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure, allowLoopback }: ApiOptions): Router {
   const router = Router();
   router.use(requireJsonBody, express.json({ limit: "100kb" }), loadUser(pool));
   router.use(authRoutes(pool, cookieSecure));
@@ -26,7 +27,7 @@ export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure 
   router.use(memberRoutes(pool));
   router.use(keyRoutes(pool));
   router.use(auditRoutes(pool));
-  router.use(serverRoutes(pool, upstreams, credentialsKey));
+  router.use(serverRoutes(pool, upstreams, credentialsKey, allowLoopback));
   router.use((_req, res) => void res.status(404).json({ error: "not found" }));
   router.use(apiErrors);
   return router;

@@ -13,6 +13,7 @@ export interface ToolBackend {
 }
 
 const MAX_AUDIT_ERROR = 500;
+const MAX_TOOL_NAME = 100; // caller-chosen text: bounded before it is echoed back or stored
 
 function errorResult(message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
@@ -37,7 +38,7 @@ export class Gateway {
     let outcome: "ok" | "error" = "error";
     let error: string | null = null;
     try {
-      if (!parts) throw new UpstreamError(`unknown tool '${name}'`);
+      if (!parts) throw new UpstreamError(`unknown tool '${name.slice(0, MAX_TOOL_NAME)}'`);
       const result = await this.backend.callTool(parts.slug, parts.tool, args);
       if (result.isError) {
         // The upstream's own error text is a result, so it is not copied into the audit log.
@@ -55,7 +56,7 @@ export class Gateway {
       error = "internal error";
       return errorResult("internal error while calling the tool");
     } finally {
-      await this.audit(user, parts?.slug ?? null, parts?.tool ?? name, startedAt, Math.round(performance.now() - timer), outcome, error, source);
+      await this.audit(user, parts?.slug ?? null, (parts?.tool ?? name).slice(0, MAX_TOOL_NAME), startedAt, Math.round(performance.now() - timer), outcome, error, source);
     }
   }
 

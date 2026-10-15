@@ -29,8 +29,8 @@ describe("/api servers", () => {
     await makeUser(pool, "bob@x.io", "member");
     fake = new FakeUpstream({ ping: () => "pong" });
     await fake.start();
-    manager = new UpstreamManager({ pool, credentialsKey: CREDENTIALS_KEY, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300 });
-    server = await startServer(pool, manager);
+    manager = new UpstreamManager({ pool, credentialsKey: CREDENTIALS_KEY, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300, allowLoopback: true });
+    server = await startServer(pool, manager, { allowLoopback: true });
     base = server.base;
     admin = await login(base, "alice@x.io");
     member = await login(base, "bob@x.io");
@@ -86,7 +86,10 @@ describe("/api servers", () => {
       expect((await create({ url })).status).toBe(400);
     });
 
-    it.each(["Host", "cookie", "Authorization", "Content-Length", "bad name", "x:y", ""])("rejects header name %j with 400", async (name) => {
+    it.each([
+      "Host", "cookie", "Authorization", "Content-Length", "bad name", "x:y", "",
+      "Content-Type", "Accept", "Mcp-Session-Id", "MCP-Protocol-Version", "Proxy-Authorization", "Upgrade", "TE",
+    ])("rejects header name %j with 400", async (name) => {
       expect((await create({ auth: { type: "header", name, value: "v" } })).status).toBe(400);
     });
 
@@ -97,6 +100,33 @@ describe("/api servers", () => {
     it("is admin only", async () => {
       expect((await create({}, member)).status).toBe(403);
       expect((await call(base, "/servers", { body: { slug: "fake", url: fake.url } })).status).toBe(401);
+    });
+  });
+
+  // The production setting: loopback, link-local and unspecified hosts are refused (SSRF), private ranges are fine.
+  describe("host guard (allowLoopback off)", () => {
+    let strict: TestServer;
+    beforeEach(async () => {
+      strict = await startServer(pool, manager);
+    });
+    afterEach(async () => {
+      await strict.stop();
+    });
+
+    it.each(["http://127.0.0.1/mcp", "http://[::1]/mcp", "http://localhost:3000/mcp", "http://169.254.169.254/latest", "http://[fe80::1]/mcp", "http://0.0.0.0/mcp", "http://foo.localhost/mcp"])(
+      "create and PATCH reject %s with 400",
+      async (url) => {
+        expect((await call(strict.base, "/servers", { body: { slug: "bad", url }, cookie: admin })).status).toBe(400);
+        await pool.query("INSERT INTO upstream_servers (slug, url, enabled) VALUES ('ok', 'http://10.0.0.9/mcp', false)");
+        expect((await call(strict.base, "/servers/ok", { method: "PATCH", body: { url }, cookie: admin })).status).toBe(400);
+        await pool.query("DELETE FROM upstream_servers WHERE slug = 'ok'");
+      },
+    );
+
+    it("accepts a private-range and a cluster-DNS url", async () => {
+      for (const [slug, url] of [["priv", "http://10.43.0.7:3000/mcp"], ["dns", "http://woo-mcp.urumi.svc.cluster.local:3000/mcp"]]) {
+        expect((await call(strict.base, "/servers", { body: { slug, url, enabled: false }, cookie: admin })).status).toBe(201);
+      }
     });
   });
 

@@ -169,6 +169,26 @@ describe("/api invites and members", () => {
       expect((await call(base, "/me", { cookie: admin })).body.role).toBe("admin");
     });
 
+    // Each admin passes the auth check before the other's change lands, so only the transaction can stop both.
+    it.each([{ role: "member" }, { disabled: true }])("two admins removing each other at once leaves one enabled admin (%j)", async (change) => {
+      const otherId = await makeUser(pool, "carol@x.io", "admin");
+      await pool.query("UPDATE users SET role = 'member' WHERE id = $1", [memberId]); // admins are alice and carol only
+      const carol = await login(base, "carol@x.io");
+      const [a, b] = await Promise.all([
+        call(base, `/members/${otherId}`, { method: "PATCH", body: change, cookie: admin }),
+        call(base, `/members/${adminId}`, { method: "PATCH", body: change, cookie: carol }),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      const left = await pool.query("SELECT 1 FROM users WHERE role = 'admin' AND disabled_at IS NULL");
+      expect(left.rowCount).toBe(1);
+    });
+
+    it("lets an admin be demoted, then another disabled, while an enabled admin remains", async () => {
+      const carolId = await makeUser(pool, "carol@x.io", "admin");
+      expect((await call(base, `/members/${carolId}`, { method: "PATCH", body: { role: "member" }, cookie: admin })).status).toBe(200);
+      expect((await call(base, `/members/${memberId}`, { method: "PATCH", body: { disabled: true }, cookie: admin })).status).toBe(200);
+    });
+
     it("answers 404 for an unknown member and 400 for an empty or bad patch", async () => {
       expect((await call(base, "/members/9999", { method: "PATCH", body: { disabled: true }, cookie: admin })).status).toBe(404);
       expect((await call(base, `/members/${memberId}`, { method: "PATCH", body: {}, cookie: admin })).status).toBe(400);

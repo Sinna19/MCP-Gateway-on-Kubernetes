@@ -12,6 +12,7 @@ export interface AppOptions {
   idleMs?: number;
   now?: () => number;
   cookieSecure?: boolean;
+  allowLoopback?: boolean; // tests only: lets /api/servers accept 127.0.0.1 upstream URLs
 }
 
 export interface App {
@@ -45,7 +46,7 @@ export function createApp(options: AppOptions): App {
     );
   });
   app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
-  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false }));
+  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback }));
   app.use(jsonErrors);
 
   return { express: app, gateway, sessionCount: mcp.sessionCount, sweep: mcp.sweep, closeSessions: mcp.closeAll };

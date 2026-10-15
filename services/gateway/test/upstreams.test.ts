@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type pg from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { encrypt } from "../src/crypto.js";
+import { Gateway } from "../src/gateway.js";
 import { UpstreamManager } from "../src/upstreams.js";
 import { FakeUpstream, startHungServer, waitFor } from "./fake-upstream.js";
 import { createTestDb, resetData } from "./helpers.js";
@@ -24,10 +26,12 @@ describe("UpstreamManager", () => {
   beforeEach(async () => {
     await resetData(pool);
     changes = 0;
-    manager = new UpstreamManager({ pool, credentialsKey: key, callTimeoutMs: 300, connectTimeoutMs: 400, pingTimeoutMs: 300 });
+    // The fake upstreams listen on 127.0.0.1, which the SSRF guard blocks unless a test opts out.
+    manager = new UpstreamManager({ pool, credentialsKey: key, callTimeoutMs: 300, connectTimeoutMs: 400, pingTimeoutMs: 300, allowLoopback: true });
     manager.on("toolsChanged", () => changes++);
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
     await manager.stop();
     for (const c of cleanups.splice(0)) await c();
   });
@@ -95,6 +99,51 @@ describe("UpstreamManager", () => {
     await pool.query("UPDATE upstream_servers SET enabled = false WHERE slug = 'slow'");
     await manager.reload();
     await expect(manager.callTool("slow", "wait", {})).rejects.toThrow("server 'slow' is disabled");
+  });
+
+  it("an unexpected call failure says only 'server <slug> failed' to the caller and the audit log; detail goes to the server log", async () => {
+    await fake("woo", { echo: () => "x" });
+    await manager.reload();
+    const detail = "connect ECONNREFUSED 10.1.2.3:3000 internal-detail";
+    vi.spyOn(Client.prototype, "callTool").mockRejectedValue(new Error(detail));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await expect(manager.callTool("woo", "echo", {})).rejects.toThrow(/^server 'woo' failed$/);
+    expect(warn.mock.calls.flat().join(" ")).toContain(detail);
+
+    const { rows } = await pool.query("INSERT INTO users (email, role, password_hash) VALUES ('a@x.io', 'member', 'x') RETURNING id");
+    const result = await new Gateway(pool, manager).callTool({ id: rows[0].id, email: "a@x.io", role: "member" }, "woo__echo", {}, "mcp");
+    expect(JSON.stringify(result.content)).toBe(JSON.stringify([{ type: "text", text: "server 'woo' failed" }]));
+    const audit = await pool.query("SELECT error FROM audit_log");
+    expect(audit.rows).toEqual([{ error: "server 'woo' failed" }]);
+  });
+
+  it("a stored credential that cannot be decrypted makes only that server Unreachable, and logs the slug but no detail", async () => {
+    await fake("woo", { t: () => "x" });
+    await pool.query("INSERT INTO upstream_servers (slug, url, header_name, credential_enc) VALUES ('bad', 'http://10.0.0.9/mcp', 'Authorization', 'not-a-ciphertext')");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await manager.reload();
+    expect(status("bad")).toBe("unreachable");
+    expect(status("woo")).toBe("connected");
+    const logged = warn.mock.calls.flat().join(" ");
+    expect(logged).toContain("'bad'");
+    expect(logged).toContain("could not be decrypted");
+    expect(logged).not.toContain("not-a-ciphertext");
+  });
+
+  it("without allowLoopback, never contacts an upstream on a loopback address (literal IP or localhost)", async () => {
+    const strict = new UpstreamManager({ pool, credentialsKey: key, connectTimeoutMs: 400 });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const up = await fake("lit", { t: () => "x" });
+      await pool.query("INSERT INTO upstream_servers (slug, url) VALUES ('named', $1)", [up.url.replace("127.0.0.1", "localhost")]);
+      await strict.reload();
+      expect(strict.statuses().map((s) => [s.slug, s.status]).sort()).toEqual([["lit", "unreachable"], ["named", "unreachable"]]);
+      expect(up.methods).toEqual([]);
+      expect(warn.mock.calls.flat().join(" ")).toContain("not allowed");
+    } finally {
+      await strict.stop();
+    }
   });
 
   it("marks a stopped upstream Unreachable, drops its tools, and recovers", async () => {

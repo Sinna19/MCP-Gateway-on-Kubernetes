@@ -5,6 +5,7 @@ import { CallToolResultSchema, ErrorCode, McpError, ToolListChangedNotificationS
 import type pg from "pg";
 import { decrypt } from "./crypto.js";
 import { isValidToolName, prefixed } from "./tool-names.js";
+import { assertAllowedHost } from "./url-guard.js";
 
 export type UpstreamStatus = "connected" | "unreachable" | "disabled";
 
@@ -44,6 +45,7 @@ export interface UpstreamManagerOptions {
   connectTimeoutMs?: number;
   pingTimeoutMs?: number;
   intervalMs?: number;
+  allowLoopback?: boolean; // tests only: their fake upstreams listen on 127.0.0.1. Never set in production.
 }
 
 // Errors with a message that is safe to show to the caller (names the server, never a credential).
@@ -61,9 +63,11 @@ export class UpstreamManager extends EventEmitter {
   private readonly connectTimeoutMs: number;
   private readonly pingTimeoutMs: number;
   private readonly intervalMs: number;
+  private readonly allowLoopback: boolean;
 
   constructor(options: UpstreamManagerOptions) {
     super();
+    this.allowLoopback = options.allowLoopback ?? false;
     this.pool = options.pool;
     this.key = options.credentialsKey;
     this.callTimeoutMs = options.callTimeoutMs ?? 15_000;
@@ -159,13 +163,29 @@ export class UpstreamManager extends EventEmitter {
       if (err instanceof McpError && err.code === ErrorCode.RequestTimeout) {
         throw new UpstreamError(`server '${slug}' timed out after ${this.callTimeoutMs / 1000}s`);
       }
-      throw new UpstreamError(`server '${slug}' failed: ${err instanceof Error ? err.message : String(err)}`);
+      // The caller (and the audit log) only learn that it failed; the detail may hold internal addresses.
+      console.warn(`upstream '${slug}' call to '${tool}' failed: ${err instanceof Error ? err.message : String(err)}`);
+      throw new UpstreamError(`server '${slug}' failed`);
     }
   }
 
   private async connect(entry: Entry): Promise<void> {
     const { row } = entry;
-    const headers = row.header_name && row.credential_enc ? { [row.header_name]: decrypt(this.key, row.credential_enc, row.slug) } : undefined;
+    try {
+      if (!this.allowLoopback) await assertAllowedHost(new URL(row.url).hostname);
+    } catch (err) {
+      this.markUnreachable(entry);
+      console.warn(`upstream '${row.slug}' unreachable: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    let headers: Record<string, string> | undefined;
+    try {
+      headers = row.header_name && row.credential_enc ? { [row.header_name]: decrypt(this.key, row.credential_enc, row.slug) } : undefined;
+    } catch {
+      this.markUnreachable(entry); // log the slug only: the error text could say something about the key
+      console.warn(`upstream '${row.slug}' unreachable: stored credential could not be decrypted`);
+      return;
+    }
     const transport = new StreamableHTTPClientTransport(new URL(row.url), {
       requestInit: headers ? { headers } : undefined,
       fetch: this.limitedFetch,

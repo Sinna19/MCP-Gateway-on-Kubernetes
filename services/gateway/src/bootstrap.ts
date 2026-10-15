@@ -16,7 +16,7 @@ export async function bootstrap(pool: pg.Pool, options: BootstrapOptions): Promi
     await client.query("LOCK TABLE users IN EXCLUSIVE MODE");
     const { rows } = await client.query("SELECT 1 FROM users LIMIT 1");
     if (rows.length === 0) {
-      await client.query("INSERT INTO users (email, role, password_hash) VALUES ($1, 'admin', $2)", [options.adminEmail, await hashPassword(options.adminPassword)]);
+      await client.query("INSERT INTO users (email, role, password_hash) VALUES ($1, 'admin', $2)", [options.adminEmail.trim().toLowerCase(), await hashPassword(options.adminPassword)]);
       await client.query("INSERT INTO upstream_servers (slug, url) VALUES ('woo', $1)", [options.wooUrl]);
     }
     await client.query("COMMIT");
