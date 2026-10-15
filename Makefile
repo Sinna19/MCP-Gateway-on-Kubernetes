@@ -22,6 +22,7 @@ secrets:
 
 deploy: deps secrets
 	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml
+	scripts/wait-setup.sh
 
 # Prints failures only, then a one-line summary. eslint/tsc get added with the first TS service.
 lint: deps

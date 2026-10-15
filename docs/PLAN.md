@@ -73,6 +73,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 
 ## Phase 7: DoD run + hardening
 - [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user)
+- [ ] NetworkPolicy so MariaDB only accepts WordPress and the setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`)
 - [ ] Full manual rehearsal with users A and B, following the DoD in `docs/ASSIGNMENT.md`
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster.
 

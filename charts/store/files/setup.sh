@@ -93,7 +93,7 @@ fi
 # Secret woo-api already exists (scripts/secrets.sh) with only "username". This Job fills in "password".
 SA=/var/run/secrets/kubernetes.io/serviceaccount
 SECRET_URL="https://kubernetes.default.svc/api/v1/namespaces/$(cat $SA/namespace)/secrets/$API_SECRET"
-kube() { curl -sS --fail --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat $SA/token)" "$@"; }
+kube() { curl -sS --fail-with-body --cacert "$SA/ca.crt" -H "Authorization: Bearer $(cat $SA/token)" "$@"; }
 
 # shellcheck disable=SC2016  # the $ signs are PHP variables, not shell
 current="$(kube "$SECRET_URL" | php -r '$d = json_decode(stream_get_contents(STDIN), true); echo $d["data"]["password"] ?? "";')"
@@ -103,7 +103,9 @@ else
   # Drop any application password of ours (a previous run may have died before patching the Secret).
   wp user application-password list "$INTEGRATION_USER" --fields=uuid,name --format=csv | tail -n +2 |
     while IFS=, read -r uuid name; do
-      [ "$name" = "$INTEGRATION_USER" ] && wp user application-password delete "$INTEGRATION_USER" "$uuid" >/dev/null
+      if [ "$name" = "$INTEGRATION_USER" ]; then
+        wp user application-password delete "$INTEGRATION_USER" "$uuid" >/dev/null
+      fi
     done
   app_password="$(wp user application-password create "$INTEGRATION_USER" "$INTEGRATION_USER" --porcelain)"
   # Body goes in on stdin so the password never shows up in a process list.
