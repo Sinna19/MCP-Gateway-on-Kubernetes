@@ -1,14 +1,16 @@
 # Handoff
 
-- **Done this session:** Phase 3b commit 3 of 3 finished; PLAN 3b boxes ticked.
-  - d42ca3a `feat(gateway): API keys and audit endpoints`: `src/api/{keys,audit}.ts` mounted in `router.ts`; `test/api-keys-audit.test.ts` (written first). `make lint` and `make test` green (146 tests).
-  - ccb3386 `docs: ADR 008 dashboard auth, tick PLAN 3b`.
-  - Live smoke (local gateway + Docker Postgres + port-forwarded woo-mcp): login cookie 200; `/api/servers` shows `woo` connected, 5 tools, no credential field; `POST /api/keys` 201; `/mcp tools/list` lists 5 `woo__*`; `DELETE /api/keys/:id` 204; `/mcp` with revoked key 401; `/api/audit` shows the `list_products` call. All PASS.
-- **In progress:** nothing half-finished; tree clean after this commit.
-- **Next step:** `3c Dockerfile + charts + Accept`
+- **Done this session:** Phase 3c steps 0 to 3. `make lint` and `make test` green, `make deploy` green.
+  - dce32ee `test(gateway): drop test DB without FORCE` (plain DROP, retry on 55006, FORCE last; 10x loop of mcp-endpoint.test.ts passed 13/13).
+  - 5ea9785 `feat(gateway): Dockerfile and secrets` (Dockerfile copies `migrations/`; `scripts/secrets.sh` makes `gateway-db`, `gateway-app`).
+  - b7465eb `feat(gateway): chart with Postgres, Ingress, NetworkPolicy` (+ Makefile GATEWAY_TAG).
+  - Live: `gateway` and `gateway-postgres-0` 1/1 Running, log "gateway listening on :8080", `curl http://app.localtest.me/api/servers` gives 401.
+- **In progress:** nothing half-finished; tree clean after this commit. PLAN 3c boxes are NOT ticked yet (Accept not run).
+- **Next step:** `3c Accept + ADR 009`: write `docs/decisions/009-gateway-deployment.md`, run Accept checks 1 to 6 from the plan file `C:\Users\aashi\.claude\plans\3c-dockerfile-charts-glowing-rainbow.md`, tick PLAN 3c, add gotchas to rules.
+  - Accept: curl login + `POST /api/keys` + `tools/list` lists 5 `woo__*`; `claude mcp add` in default local scope (never `-s project`); revoked key 401; `scale deploy/woo-mcp --replicas=0` then poll `/api/servers` for Unreachable (gateway stays Ready), scale back to 1; delete `gateway-postgres-0`, login still works; `timeout 90 curl -N` GET `/mcp` with a session id stays open.
 - **Gotchas learned:**
-  - `mcp-endpoint.test.ts` flaked once (unhandled pg 57P01 when the test DB is dropped); passed on rerun, also on baseline. If it recurs, make its teardown end the pool before `drop()`.
-  - Key/audit ids in JSON are strings (pg bigint); added to `.claude/rules/gateway.md` with the local smoke recipe.
-  - `pkill` is missing in Git Bash; use PowerShell `Stop-Process`.
-  - Phase 3 Accept checks are NOT yet run; they need the chart (3c).
-- **Files the next task needs:** CLAUDE.md, `docs/PLAN.md` (Phase 3 section), `.claude/rules/gateway.md` and `.claude/rules/kubernetes.md`, `services/gateway/{package.json,src/index.ts,src/config.ts}` (env vars), `services/gateway/migrations/` (Dockerfile must copy it), an existing chart as the style model (`charts/woo-mcp/`), `charts/platform/`, `deploy/values-local.yaml`, `Makefile`.
+  - A long `cat > file <<'EOF'` batch in Bash failed to parse and wrote nothing; use the Write tool for chart files.
+  - `cd` in a Bash call moves the working directory for later calls; use `cd /c/Users/aashi/dev/urumi-assignment && ...` or absolute paths.
+  - Gateway Postgres pods are labelled `gateway-postgres`, never `gateway` (the woo-mcp NetworkPolicy allows `name=gateway`). `DB_PASSWORD` must precede `DATABASE_URL` in env. Read the admin password with the command in `scripts/secrets.sh`.
+  - `sleep N` in Bash is blocked; use `kubectl rollout status` or Monitor.
+- **Files the next task needs:** the plan file above, `docs/PLAN.md` (Phase 3 section, lines 45 to 52), `docs/decisions/008-dashboard-auth.md` (ADR style), `.claude/rules/{kubernetes,gateway}.md`, `charts/gateway/templates/{deployment,ingress}.yaml`.
