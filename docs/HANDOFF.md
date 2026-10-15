@@ -11,4 +11,4 @@
   - Key/audit ids in JSON are strings (pg bigint); added to `.claude/rules/gateway.md` with the local smoke recipe.
   - `pkill` is missing in Git Bash; use PowerShell `Stop-Process`.
   - Phase 3 Accept checks are NOT yet run; they need the chart (3c).
-- **Files the next task needs:** CLAUDE.md, `docs/PLAN.md` (Phase 3 section), `.claude/rules/gateway.md` and `.claude/rules/charts.md`, `services/gateway/{package.json,src/index.ts,src/config.ts}` (env vars), `services/gateway/migrations/` (Dockerfile must copy it), an existing chart as the style model (`charts/woo-mcp/`), `charts/platform/`, `deploy/values-local.yaml`, `Makefile`.
+- **Files the next task needs:** CLAUDE.md, `docs/PLAN.md` (Phase 3 section), `.claude/rules/gateway.md` and `.claude/rules/kubernetes.md`, `services/gateway/{package.json,src/index.ts,src/config.ts}` (env vars), `services/gateway/migrations/` (Dockerfile must copy it), an existing chart as the style model (`charts/woo-mcp/`), `charts/platform/`, `deploy/values-local.yaml`, `Makefile`.
