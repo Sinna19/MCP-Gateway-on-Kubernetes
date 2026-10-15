@@ -1,7 +1,7 @@
 SHELL := bash
 NS := urumi
 CHARTS := store woo-mcp gateway upstreams platform
-TS_SERVICES := woo-mcp
+TS_SERVICES := woo-mcp gateway
 
 .NOTPARALLEL:
 .PHONY: cluster-up cluster-down images deps secrets deploy lint test dod
