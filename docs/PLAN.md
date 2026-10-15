@@ -35,9 +35,9 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [x] **Accept:** checkout with COD at `http://shop.localtest.me`; order visible in WP admin; `kubectl delete pod` on WordPress and MariaDB, data still there; Job rerun is a no-op.
 
 ## Phase 2: woo-mcp
-- [ ] TS service using the MCP SDK, Streamable HTTP at `/mcp`, `/healthz` and `/readyz`
-- [ ] Tools with zod schemas and clear descriptions: `list_products`, `create_product`, `list_orders` (filter by date/status), `get_order`, `update_order_status`
-- [ ] Reads Woo URL + app password from env (Secret). Errors become MCP tool errors, not crashes
+- [x] TS service using the MCP SDK, Streamable HTTP at `/mcp`, `/healthz` and `/readyz`
+- [x] Tools with zod schemas and clear descriptions: `list_products`, `create_product`, `list_orders` (filter by date/status), `get_order`, `update_order_status`
+- [x] Reads Woo URL + app password from env (Secret). Errors become MCP tool errors, not crashes
 - [ ] Chart: ClusterIP Service, no Ingress, NetworkPolicy ingress only from `app.kubernetes.io/name=gateway`
 - [ ] ADR: why REST API + Application Passwords over WP-CLI or direct DB
 - **Accept:** MCP Inspector via `kubectl port-forward` lists 5 tools; create product shows on storefront; a curl pod without the gateway label is blocked by the NetworkPolicy.
@@ -87,5 +87,6 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] README: local setup, VPS setup, place an order, connect an MCP client, use chat
 - [ ] `docs/DESIGN.md` (architecture, aggregation, routing, failure handling, prod changes)
 - [ ] `docs/THREAT_MODEL.md` (the four required questions)
+- [ ] GitHub Actions CI: make lint + tests on every push (stand-out item)
 - [ ] Stand-out items list with file pointers
 - [ ] Demo script following the six required video sections; record
