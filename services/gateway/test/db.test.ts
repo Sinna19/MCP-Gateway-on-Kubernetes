@@ -1,6 +1,6 @@
-import type pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate } from "../src/db.js";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { createPool, migrate } from "../src/db.js";
 import { createTestDb } from "./helpers.js";
 
 describe("migrate", () => {
@@ -31,5 +31,21 @@ describe("migrate", () => {
       await expect(pool.query("INSERT INTO upstream_servers (slug, url) VALUES ($1, 'http://x')", [slug])).rejects.toThrow();
     }
     await pool.query("INSERT INTO upstream_servers (slug, url) VALUES ('fx-rates', 'http://x')");
+  });
+});
+
+describe("createPool", () => {
+  it("survives Postgres killing an idle connection", async () => {
+    const pool = createPool(inject("databaseUrl"));
+    const admin = new pg.Pool({ connectionString: inject("databaseUrl"), max: 1 });
+    try {
+      const { rows } = await pool.query("SELECT pg_backend_pid() AS pid");
+      await admin.query("SELECT pg_terminate_backend($1)", [rows[0].pid]);
+      await new Promise((resolve) => setTimeout(resolve, 300)); // let the idle-client error arrive
+      expect((await pool.query("SELECT 1 AS ok")).rows[0].ok).toBe(1);
+    } finally {
+      await pool.end();
+      await admin.end();
+    }
   });
 });

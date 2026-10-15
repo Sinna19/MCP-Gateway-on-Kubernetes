@@ -5,7 +5,11 @@ const MIGRATIONS_DIR = new URL("../migrations/", import.meta.url);
 const LOCK_ID = 74_001; // arbitrary number; stops two replicas migrating at once
 
 export function createPool(databaseUrl: string): pg.Pool {
-  return new pg.Pool({ connectionString: databaseUrl });
+  const pool = new pg.Pool({ connectionString: databaseUrl });
+  // An idle client errors when Postgres restarts (57P01). With no listener Node treats that as fatal and the pod crashes.
+  // Log only: pg drops the dead client and the next query opens a new connection.
+  pool.on("error", (err) => console.error("postgres pool error (idle client dropped):", err.message));
+  return pool;
 }
 
 // Runs each migrations/*.sql file once, in name order, and records it in schema_migrations.
