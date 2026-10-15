@@ -91,6 +91,6 @@ Traefik is not involved: woo-mcp has no Ingress. (The storefront is the only thi
 - **Plain HTTP and Basic auth in-cluster.** Acceptable inside one namespace on one node; on a multi-node VPS it crosses the node network. Mesh/TLS is the upgrade.
 - **Same-namespace label match.** The policy has no `namespaceSelector`, so it only matches pods in `urumi`. That is intended, but say so.
 - **`/readyz` makes a Woo call every 10 s** and a bad password makes the pod NotReady (not a clear alert).
-- **Single replica, `latest` default tag in `values.yaml:4`** (always overridden by `make deploy`; a plain `helm install` would fail to pull).
+- **Single replica.** `image.tag` is empty by default and `deployment.yaml:25` uses `required`, so a plain `helm install` fails with "image.tag must be set; use make deploy" instead of ImagePullBackOff. `make lint` passes a dummy tag.
 - **No pagination beyond `page`/`per_page`**, and `trimOrder` returns the customer's name, which is personal data going to the LLM.
 - **The deny test exits 7, not 28**, and a brand-new pod is refused for a few seconds even when labelled. Know why.

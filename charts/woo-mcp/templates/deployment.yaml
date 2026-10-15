@@ -22,7 +22,7 @@ spec:
         runAsGroup: 1000
       containers:
         - name: woo-mcp
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ required "image.tag must be set; use make deploy" .Values.image.tag }}"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

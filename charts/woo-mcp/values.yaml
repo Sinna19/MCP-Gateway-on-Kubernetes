@@ -1,7 +1,7 @@
 image:
   repository: urumi/woo-mcp
-  # Set by `make deploy` to the tree hash of services/woo-mcp.
-  tag: latest
+  # Must be set. `make deploy` passes the tree hash of services/woo-mcp.
+  tag: ""
 
 port: 3000
 
