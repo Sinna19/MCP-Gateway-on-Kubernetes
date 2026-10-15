@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  # One replica: /mcp sessions live in memory (ADR 006). Recreate so two pods never overlap in a rollout.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        {{- include "gateway.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Waits for Postgres so the first start does not crashloop inside migrate().
+        - name: wait-for-db
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h gateway-postgres -p 5432 -U {{ .Values.postgres.user }}; do sleep 2; done"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ required "image.tag must be set; use make deploy" .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.port | quote }}
+            # DB_PASSWORD must come before DATABASE_URL: $(VAR) only expands variables defined earlier in this list.
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dbSecret }}
+                  key: password
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.postgres.user }}:$(DB_PASSWORD)@gateway-postgres:5432/{{ .Values.postgres.database }}"
+            - name: CREDENTIALS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.appSecret }}
+                  key: credentials-key
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.appSecret }}
+                  key: admin-email
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.appSecret }}
+                  key: admin-password
+            - name: SEED_WOO_URL
+              value: {{ .Values.seedWooUrl | quote }}
+            - name: COOKIE_SECURE
+              value: {{ .Values.global.ingress.tls | quote }}
+          # The process is up.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          # Checks the database only, never woo-mcp: an upstream outage must not take the gateway out of its Service.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,29 @@
+{{- $host := printf "%s.%s" .Values.host .Values.global.domain }}
+# Only /mcp and /api are exposed. /healthz and /readyz stay cluster-internal.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.global.ingress.className }}
+  {{- if .Values.global.ingress.tls }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: gateway-tls
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range list "/mcp" "/api" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
+          {{- end }}

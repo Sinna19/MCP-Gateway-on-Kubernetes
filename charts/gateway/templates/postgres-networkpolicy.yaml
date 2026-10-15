@@ -1,0 +1,21 @@
+# The database holds users, key hashes and encrypted upstream credentials, so only gateway pods may connect.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-postgres-allow-gateway
+  labels:
+    app.kubernetes.io/name: gateway-postgres
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+      ports:
+        - port: 5432
+          protocol: TCP

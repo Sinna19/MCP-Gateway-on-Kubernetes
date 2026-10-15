@@ -1,1 +1,38 @@
-# gateway values (filled in a later phase)
+image:
+  repository: urumi/gateway
+  # Must be set. `make deploy` passes the tree hash of services/gateway.
+  tag: ""
+
+port: 8080
+
+# Ingress host is <host>.<global.domain>. Only /mcp and /api are routed; the dashboard gets / in Phase 5.
+host: app
+
+# Secrets created by scripts/secrets.sh. Keys: gateway-db/password, gateway-app/{credentials-key,admin-email,admin-password}.
+dbSecret: gateway-db
+appSecret: gateway-app
+
+# First upstream registered on first start (in-cluster woo-mcp Service).
+seedWooUrl: http://woo-mcp:3000/mcp
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+postgres:
+  image: postgres:17.6-alpine
+  database: gateway
+  user: gateway
+  storage:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
