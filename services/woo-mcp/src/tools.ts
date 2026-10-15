@@ -10,7 +10,9 @@ async function toolResult(run: () => Promise<unknown>) {
     const data = await run();
     return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
   } catch (err) {
-    // WooError messages are written by us and safe to show. Anything else may leak internals.
+    // WooError messages are written by us and safe to show. Anything else may leak internals,
+    // so the caller gets a generic message and the real error goes to the pod log.
+    if (!(err instanceof WooError)) console.error("tool failed:", err);
     const text = err instanceof WooError ? err.message : "Unexpected error while talking to WooCommerce";
     return { isError: true, content: [{ type: "text" as const, text }] };
   }
@@ -52,8 +54,8 @@ export function registerTools(server: McpServer, woo: WooClient): void {
     },
     ({ search, per_page, page }) =>
       toolResult(async () => {
-        const products = (await woo.request("GET", "/products", { query: { search, per_page, page } })) as Rec[];
-        return products.map(trimProduct);
+        const { items, total, total_pages } = await woo.list("/products", { search, per_page, page });
+        return { items: (items as Rec[]).map(trimProduct), total, total_pages };
       }),
   );
 
@@ -100,8 +102,8 @@ export function registerTools(server: McpServer, woo: WooClient): void {
       toolResult(async () => {
         // dates_are_gmt=true makes Woo read after/before as UTC, not in the store's timezone.
         const query = { status, after, before, dates_are_gmt: true, per_page, page };
-        const orders = (await woo.request("GET", "/orders", { query })) as Rec[];
-        return orders.map(trimOrder);
+        const { items, total, total_pages } = await woo.list("/orders", query);
+        return { items: (items as Rec[]).map(trimOrder), total, total_pages };
       }),
   );
 

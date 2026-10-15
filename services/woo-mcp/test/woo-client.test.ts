@@ -55,6 +55,35 @@ describe("woo client", () => {
     await expect(client(fetchMock).request("GET", "/products")).rejects.toThrow("WooCommerce returned 502");
   });
 
+  it("rejects a 200 response that is not JSON (e.g. HTML from bad permalinks)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("<html>Not found</html>", { status: 200 }));
+    await expect(client(fetchMock).request("GET", "/products")).rejects.toThrow(
+      "WooCommerce returned an unexpected non-JSON response",
+    );
+  });
+
+  it("list() returns items with the totals from the X-WP headers", async () => {
+    const res = new Response(JSON.stringify([{ id: 1 }, { id: 2 }]), {
+      status: 200,
+      headers: { "X-WP-Total": "42", "X-WP-TotalPages": "3" },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(res);
+    const out = await client(fetchMock).list("/products", { per_page: 2 });
+    expect(out).toEqual({ items: [{ id: 1 }, { id: 2 }], total: 42, total_pages: 3 });
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://store-wordpress/wp-json/wc/v3/products?per_page=2");
+  });
+
+  it("list() falls back to the item count when the headers are missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, [{ id: 1 }]));
+    const out = await client(fetchMock).list("/products");
+    expect(out).toEqual({ items: [{ id: 1 }], total: 1, total_pages: 1 });
+  });
+
+  it("list() rejects a response that is not an array", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { oops: true }));
+    await expect(client(fetchMock).list("/products")).rejects.toThrow("unexpected response");
+  });
+
   it("wraps a network failure", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     await expect(client(fetchMock).request("GET", "/products")).rejects.toThrow(
