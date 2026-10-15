@@ -11,3 +11,4 @@ Status: accepted
 ## Consequences
 - Dependency tarballs (`charts/*/charts/*.tgz`) are gitignored and rebuilt on deploy.
 - Namespace deletion is a manual, deliberate act.
+- The API port is pinned to 6550 (`--api-port`). On Windows, k3d's random port can fall in a reserved range (`netsh interface ipv4 show excludedportrange protocol=tcp`), and after a Docker restart the cluster then refuses to start.
