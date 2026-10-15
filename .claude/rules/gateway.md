@@ -21,4 +21,7 @@ paths:
   - Client: `new StreamableHTTPClientTransport(url, { requestInit: { headers }, fetch })`. `client.callTool(params, undefined, { timeout })`, `listTools(undefined, { timeout })`, `ping({ timeout })`. Default timeout 60s; on timeout it throws `McpError` code `RequestTimeout`.
   - Client `new Client(info, { listChanged: { tools: { onChanged, autoRefresh, debounceMs } } })` handles upstream `tools/list_changed` (only if the server declares `tools.listChanged`).
   - Server stateful: new `StreamableHTTPServerTransport({ sessionIdGenerator: randomUUID, onsessioninitialized })`, `transport.onclose` removes the session; `isInitializeRequest(body)` gates new sessions; same `transport.handleRequest(req, res, body)` for POST/GET/DELETE; missing session gives 404.
+- `pg` returns bigint ids as strings although `AuthUser.id` is typed number: compare with `Number(...)`.
+- Tests must not contain literal passwords or tokens (the secret-guard hook blocks them): generate with `randomBytes` (see `test/api-helpers.ts`).
+- `/api` (dashboard): session cookie `urumi_session` (hash in `sessions`), JSON-only POST/PATCH (415 otherwise, our CSRF defence with SameSite=Strict), one error handler in `src/api/errors.ts`. Disabling a user deletes sessions; their API keys stay but are rejected while disabled.
 - HTTP servers set requestTimeout/headersTimeout. Outbound fetch to upstreams uses redirect: 'error' and a timeout that covers the body.

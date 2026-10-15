@@ -1,20 +1,13 @@
 # Handoff
 
-- **Done this session:** Phase 3a (gateway service + /mcp). 61 tests pass against real Postgres (Docker), `make lint` clean.
-  - 340eeae scaffold, migrations, test Postgres (global-setup starts `postgres:17.6-alpine`)
-  - 044e9c9 crypto (AES-GCM, slug as AAD), API keys, scrypt passwords, tool names, bootstrap
-  - 12da94b UpstreamManager (persistent clients, ping tick, `reload()`, `toolsChanged` only on a real diff)
-  - 92f23a2 Gateway.callTool (audit in finally), stateful `/mcp` (DELETE, 30 min idle sweep), config, index
-  - 2042c8f ADRs 006 (sessions) and 007 (tool naming), PLAN split into 3a/3b/3c
-  - Smoke on real cluster: port-forward woo-mcp + local gateway: `tools/list` = 5 `woo__*` tools, call returned a product, no key 401, revoked key 401, audit row written.
-- **In progress:** nothing half-finished. PLAN Phase 3 boxes: 3a ticked for manager and `/mcp`; the rest are annotated with what is left.
-- **Next step:** `3b gateway REST API`
-  - Session-cookie login (`verifyPassword` exists), servers CRUD (admin; call `upstreams.reload()` after each change, encrypt credentials with slug as AAD), members + invites, own keys (admin revokes any), audit query, serializers that never include credentials (unit test). Then 3c: Dockerfile, Postgres + gateway charts, Ingress, Accept checks.
+- **Done this session:** Phase 3b, commit 1 of 3. `make lint` and `make test` green (all gateway tests pass against real Postgres).
+  - 5cd4e24 `feat(gateway): sessions, login, invites, members`: migration 002 (sessions, invites), `src/sessions.ts`, `src/api/{router,middleware,errors,auth,invites,members}.ts`, `/api` mounted in `app.ts`, `COOKIE_SECURE` in config, tests `api-{auth,invites-members,errors}.test.ts` + `api-helpers.ts`. Includes the central `/api` error handler (zod 400, 23505 409, else generic 500).
+- **In progress:** nothing half-finished, tree clean. I started commit 2 by writing `test/server-view.test.ts`; you stopped it before the file was created, so no servers code or tests exist yet.
+- **Next step:** `3b servers API` (commit 2 of the approved plan: servers CRUD + `serverView` serializer, tests first). Then `3b keys and audit` in a fresh session (commit 3, ADR 008, live smoke, tick PLAN boxes). PLAN 3b boxes stay unticked until then.
 - **Gotchas learned:**
-  - Reads under `node_modules` are denied; SDK docs are thin. Use `raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/v1.x/src/...` (answers are in `.claude/rules/gateway.md`).
-  - Bash permission rules choke on `cmd | tail; other` chains: keep one command per call.
-  - Upstream `list_changed` is lost if it arrives before the client's GET stream opens; tests wait for the GET first (ADR 006).
-  - `migrations/` is read from `../migrations` relative to `dist/`: the Dockerfile must copy it (3c).
-  - `bootstrap` seeds woo only when there are no users, so a removed woo is not re-added.
-  - `docker` must be running for `make test` (gateway).
-- **Files the next task needs:** CLAUDE.md, docs/REQUIREMENTS.md, docs/PLAN.md (Phase 3), `.claude/rules/gateway.md`, `services/gateway/src/{app,gateway,api-keys,passwords,upstreams,crypto}.ts`, `services/gateway/test/helpers.ts`.
+  - A hook (`guard-secrets.sh`) blocks any file with `password: "<12+ chars>"` or `token = "..."`, tests included. Tests generate secrets with `randomBytes(12).toString("hex")` (see `test/api-helpers.ts`).
+  - `pg` returns bigint ids as strings, but `AuthUser.id` is typed number: compare with `Number(...)`.
+  - `db.test.ts` now compares migration count before/after instead of hard-coding it.
+  - Plan file with the full design: `C:\Users\aashi\.claude\plans\3b-gateway-rest-api-scalable-ocean.md` (servers rules: http/https only, header-name token + denylist, auth null/bearer/header, PATCH absent=keep/null=clear/object=replace, members see enabled servers only).
+- **Files the next task needs:** CLAUDE.md, `.claude/rules/gateway.md`, the plan file above, `services/gateway/src/{app,upstreams,crypto}.ts`, `src/api/{router,middleware,errors}.ts`, `test/{api-helpers,fake-upstream,upstreams.test}.ts` (look at how `UpstreamManager` is built in tests).
+  - Needed changes: `AppOptions` gains `credentialsKey` (update `index.ts`, `mcp-endpoint.test.ts`, `api-helpers.ts`), `upstreams` type gains `reload()` + `statuses()`, and `statuses()` also returns `tools: {name, description}[]`.
