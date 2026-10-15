@@ -1,16 +1,16 @@
 # Handoff
 
-- **Done this session:** Phase 3c complete, PLAN 3c ticked.
-  - a340a35 `fix(gateway): keep-alive, startupProbe, graceful shutdown` (keepAlive 95s / headers 96s, startupProbe, SIGTERM drains 10s, grace 15s; PLAN phase 7/8 hardening bullets added).
-  - 1fd97bb `docs: ADR 009, tick PLAN 3c` (ADR 009 says audit is best-effort on purpose; gotchas added to rules).
-  - Step 0a: no stale flake note was left in HANDOFF; the flake is fixed in dce32ee.
-  - Accept (real cluster): 1 PASS (login, `POST /api/keys`, `tools/list` shows 5 `woo__*`). 2 PASS (`claude mcp get urumi` Connected, local scope, no `.mcp.json`). 3 PASS (revoked key 200 then 401). 4 PASS (woo `unreachable` at t+5s, `tools/list` 200, gateway Ready, `connected` again after scale to 1). 6 PASS (`timeout 90 curl -N` GET `/mcp`: exit 124 after 91s).
-  - Accept 5 PASS WITH A BUG: after `kubectl delete pod gateway-postgres-0`, login returned 503 for about 40s, then 200 (same admin, so the PVC works). The gateway process crashed and crash-looped on `migrate()` ECONNREFUSED until Postgres was back.
-- **In progress:** nothing half-finished. Tree is clean except untracked `docs/explain/gateway-deployment.md` (not committed).
-- **Next step:** `3c pool error handler`: `services/gateway/src/db.ts:8` `createPool` has no `pool.on("error", ...)`, so an idle-client error (57P01 when Postgres dies) is an unhandled event that kills the process. Test first, then add the handler (log only) and a bounded connect retry around `migrate()` in `src/index.ts:9`. Then re-run Accept 5 and expect no restarts.
+- **Done this session:**
+  - eead1bc `docs: explain gateway deployment`.
+  - 3902100 `fix(gateway): survive Postgres restarts`: `createPool` in `services/gateway/src/db.ts` now has `pool.on("error")` (log only). Test in `test/db.test.ts` failed first with an unhandled 57P01, then passed.
+  - 59d91eb `docs: pool error handler gotcha, ADR 009 failure note` (`.claude/rules/gateway.md`, ADR 009).
+  - `make lint` ok, `make test` ok, `make images` + `make deploy` ok.
+  - Accept 5 rerun: PASS. After `kubectl delete pod gateway-postgres-0`, login 200 again 8s after the delete (Postgres Ready at 6s), gateway RESTARTS stayed 0. Previously about 40s of 503 plus a crash loop.
+- **In progress:** nothing. Tree is clean after the handoff commit.
+- **Next step:** `4 extra upstreams` (fx-mcp first, then notes-mcp; split per the split-big-phases memory). Phase 4 is the next unchecked group in PLAN.md (line 54). The Phase 0 VPS deploy checkbox (line 27) is still open.
 - **Gotchas learned:**
-  - Git Bash blocks `sleep`; poll with `read -t 1 <> <(:) || true`. `/api/servers` status is lowercase (`connected`, `unreachable`), so my first `case` patterns never matched.
-  - Traefik idles backend sockets for 90s, so Node keepAliveTimeout must exceed it (in `.claude/rules/kubernetes.md`). The pool-error gotcha is in `.claude/rules/gateway.md`.
-  - A scripted `initialized` notification needs its URL, or curl errors "no URL specified" (the session still worked).
-  - Scratchpad has `login.json`, `key.txt`, cookie jars (secrets; never print them). The `accept-main` key is still active and is what `claude mcp` uses.
-- **Files the next task needs:** `services/gateway/src/db.ts`, `services/gateway/src/index.ts`, `services/gateway/test/helpers.ts` (test DB patterns), `.claude/rules/gateway.md`.
+  - A bounded connect retry around `migrate()` in `src/index.ts:9` was NOT added. The init container (`pg_isready`) covers first start, and the pool handler covers a later Postgres restart. Only a Postgres crash during gateway startup would still crash-loop; kubelet restarts it, which is acceptable.
+  - Git Bash blocks `sleep`; poll with `read -t 1 <> <(:) || true`.
+  - Login endpoint is `POST http://app.localtest.me/api/auth/login`; credentials JSON is in an older session's scratchpad `login.json` (secret, never print). Namespace is `urumi`.
+  - On Windows, Python `open(...,'w')` rewrites LF as CRLF; pass `newline=''`. Keep LF.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 4 section), `docs/REQUIREMENTS.md`, `services/woo-mcp/` (as the template for a new MCP service), `.claude/rules/` files for the store and gateway paths.
