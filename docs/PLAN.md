@@ -38,8 +38,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [x] TS service using the MCP SDK, Streamable HTTP at `/mcp`, `/healthz` and `/readyz`
 - [x] Tools with zod schemas and clear descriptions: `list_products`, `create_product`, `list_orders` (filter by date/status), `get_order`, `update_order_status`
 - [x] Reads Woo URL + app password from env (Secret). Errors become MCP tool errors, not crashes
-- [ ] Chart: ClusterIP Service, no Ingress, NetworkPolicy ingress only from `app.kubernetes.io/name=gateway`
-- [ ] ADR: why REST API + Application Passwords over WP-CLI or direct DB
+- [x] Chart: ClusterIP Service, no Ingress, NetworkPolicy ingress only from `app.kubernetes.io/name=gateway`
+- [x] ADR: why REST API + Application Passwords over WP-CLI or direct DB
 - **Accept:** MCP Inspector via `kubectl port-forward` lists 5 tools; create product shows on storefront; a curl pod without the gateway label is blocked by the NetworkPolicy.
 
 ## Phase 3: Gateway core
