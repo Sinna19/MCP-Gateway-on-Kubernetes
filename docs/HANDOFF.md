@@ -1,13 +1,15 @@
 # Handoff
 
-- **Done this session:** Phase 3b, commit 1 of 3. `make lint` and `make test` green (all gateway tests pass against real Postgres).
-  - 5cd4e24 `feat(gateway): sessions, login, invites, members`: migration 002 (sessions, invites), `src/sessions.ts`, `src/api/{router,middleware,errors,auth,invites,members}.ts`, `/api` mounted in `app.ts`, `COOKIE_SECURE` in config, tests `api-{auth,invites-members,errors}.test.ts` + `api-helpers.ts`. Includes the central `/api` error handler (zod 400, 23505 409, else generic 500).
-- **In progress:** nothing half-finished, tree clean. I started commit 2 by writing `test/server-view.test.ts`; you stopped it before the file was created, so no servers code or tests exist yet.
-- **Next step:** `3b servers API` (commit 2 of the approved plan: servers CRUD + `serverView` serializer, tests first). Then `3b keys and audit` in a fresh session (commit 3, ADR 008, live smoke, tick PLAN boxes). PLAN 3b boxes stay unticked until then.
+- **Done this session:** Phase 3b, commit 2 of 3. `make lint` and `make test` green; 41 tests in the two new files pass against real Postgres.
+  - f0a7ef0 `feat(gateway): servers API with safe serializers`: `src/api/servers.ts` (`serverView` allow-list serializer, GET/POST/PATCH/DELETE `/api/servers`), `statuses()` now returns prefixed `tools`, new `UpstreamControl` + `ServerStatus` types in `upstreams.ts`, `AppOptions.credentialsKey`, `createApiRouter` takes `upstreams` + `credentialsKey`. Tests: `server-view.test.ts`, `api-servers.test.ts`.
+  - Rules beyond the plan: `strictObject` bodies (unknown fields such as `slug` on PATCH give 400), URLs with a username/password are rejected, header/bearer values must be printable ASCII (no CR/LF).
+- **In progress:** nothing half-finished, tree clean apart from this file. PLAN 3b boxes stay unticked until commit 3.
+- **Next step:** `3b keys and audit` (commit 3 of the approved plan: `src/api/{keys,audit}.ts`, `test/api-keys-audit.test.ts` tests first, ADR 008, live smoke from the plan file, tick PLAN 3b boxes).
 - **Gotchas learned:**
-  - A hook (`guard-secrets.sh`) blocks any file with `password: "<12+ chars>"` or `token = "..."`, tests included. Tests generate secrets with `randomBytes(12).toString("hex")` (see `test/api-helpers.ts`).
-  - `pg` returns bigint ids as strings, but `AuthUser.id` is typed number: compare with `Number(...)`.
-  - `db.test.ts` now compares migration count before/after instead of hard-coding it.
-  - Plan file with the full design: `C:\Users\aashi\.claude\plans\3b-gateway-rest-api-scalable-ocean.md` (servers rules: http/https only, header-name token + denylist, auth null/bearer/header, PATCH absent=keep/null=clear/object=replace, members see enabled servers only).
-- **Files the next task needs:** CLAUDE.md, `.claude/rules/gateway.md`, the plan file above, `services/gateway/src/{app,upstreams,crypto}.ts`, `src/api/{router,middleware,errors}.ts`, `test/{api-helpers,fake-upstream,upstreams.test}.ts` (look at how `UpstreamManager` is built in tests).
-  - Needed changes: `AppOptions` gains `credentialsKey` (update `index.ts`, `mcp-endpoint.test.ts`, `api-helpers.ts`), `upstreams` type gains `reload()` + `statuses()`, and `statuses()` also returns `tools: {name, description}[]`.
+  - `startServer(pool, upstreams)` in `test/api-helpers.ts` now passes the shared `CREDENTIALS_KEY`; a real `UpstreamManager` in a test must use that same key.
+  - `emptyUpstreams()` has `reload` and `statuses` stubs; keep them if `UpstreamControl` grows.
+  - `audit_log.server_slug` is plain text (no FK), so deleting a server keeps its audit history.
+  - Express 5: async handlers can throw and reach `apiErrors`, no try/catch or wrapper needed.
+  - The guard-secrets hook still blocks literal passwords/tokens in tests: use `randomBytes(12).toString("hex")`.
+  - Plan file with the full design: `C:\Users\aashi\.claude\plans\3b-gateway-rest-api-scalable-ocean.md` (keys/audit rules and the live smoke steps are in it).
+- **Files the next task needs:** CLAUDE.md, `.claude/rules/gateway.md`, the plan file above, `src/api-keys.ts`, `src/api/{router,middleware,members}.ts` (members.ts as the style model), `test/api-helpers.ts`, `test/api-invites-members.test.ts` (setup pattern), migration `001_init.sql` (audit_log columns).

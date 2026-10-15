@@ -24,4 +24,5 @@ paths:
 - `pg` returns bigint ids as strings although `AuthUser.id` is typed number: compare with `Number(...)`.
 - Tests must not contain literal passwords or tokens (the secret-guard hook blocks them): generate with `randomBytes` (see `test/api-helpers.ts`).
 - `/api` (dashboard): session cookie `urumi_session` (hash in `sessions`), JSON-only POST/PATCH (415 otherwise, our CSRF defence with SameSite=Strict), one error handler in `src/api/errors.ts`. Disabling a user deletes sessions; their API keys stay but are rejected while disabled.
+- `/api/servers`: only `serverView` (src/api/servers.ts) turns a server row into JSON; it lists fields one by one. Bodies are `strictObject`; PATCH `auth`: absent = keep, `null` = clear, object = replace; slug is immutable. Audit keeps `server_slug` as text, so deleting a server keeps history. Tests: `startServer` uses `CREDENTIALS_KEY` from `test/api-helpers.ts`.
 - HTTP servers set requestTimeout/headersTimeout. Outbound fetch to upstreams uses redirect: 'error' and a timeout that covers the body.
