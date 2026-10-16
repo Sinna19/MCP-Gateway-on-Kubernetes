@@ -164,6 +164,22 @@ describe("/api servers", () => {
       expect((await patch({})).status).toBe(400);
     });
 
+    // A url change without a new credential would send the stored one to the new host.
+    it("PATCH url needs the credential again", async () => {
+      await create({ auth: { type: "bearer", token: secret } });
+      const patch = (body: unknown) => call(base, "/servers/fake", { method: "PATCH", body, cookie: admin });
+      const stored = async () => (await pool.query("SELECT url, credential_enc FROM upstream_servers WHERE slug = 'fake'")).rows[0];
+      const before = await stored();
+
+      const urlOnly = await patch({ url: `${fake.url}?moved` });
+      expect(urlOnly.status).toBe(400);
+      expect(JSON.stringify(urlOnly.body)).toContain("re-entering the credential");
+      expect(await stored()).toEqual(before);
+
+      expect((await patch({ url: `${fake.url}?moved`, auth: { type: "bearer", token: secret } })).status).toBe(200);
+      expect((await patch({ auth: { type: "bearer", token: secret } })).status).toBe(200);
+    });
+
     it("PATCH and DELETE on an unknown slug give 404", async () => {
       expect((await call(base, "/servers/nope", { method: "PATCH", body: { enabled: false }, cookie: admin })).status).toBe(404);
       expect((await call(base, "/servers/nope", { method: "DELETE", cookie: admin })).status).toBe(404);

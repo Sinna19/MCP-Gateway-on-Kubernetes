@@ -72,7 +72,9 @@ function bodiesFor(allowLoopback: boolean) {
   // The slug is not here on purpose: it is the tool prefix and the encryption AAD.
   const patchBody = z
     .strictObject({ url: urlBody.optional(), enabled: z.boolean().optional(), auth: authBody.nullable().optional() })
-    .refine((b) => b.url !== undefined || b.enabled !== undefined || b.auth !== undefined, { message: "give url, enabled or auth" });
+    .refine((b) => b.url !== undefined || b.enabled !== undefined || b.auth !== undefined, { message: "give url, enabled or auth" })
+    // The stored credential would otherwise be sent to the new host. auth: null (remove it) is fine.
+    .refine((b) => b.url === undefined || b.auth !== undefined, { message: "changing url requires re-entering the credential" });
   return { createBody, patchBody };
 }
 

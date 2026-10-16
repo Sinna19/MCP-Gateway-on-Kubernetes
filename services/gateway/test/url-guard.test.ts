@@ -6,8 +6,13 @@ describe("isBlockedHost", () => {
     expect(isBlockedHost(host)).toBe(true);
   });
 
+  // IPv6 ULA (AWS IPv6 metadata), NAT64 (reaches 169.254.169.254) and CGNAT (Alibaba metadata).
+  it.each(["[fd00:ec2::254]", "[fc00::1]", "[64:ff9b::a9fe:a9fe]", "100.100.100.200", "100.64.0.1"])("blocks %s", (host) => {
+    expect(isBlockedHost(host)).toBe(true);
+  });
+
   // Private ranges stay allowed: in-cluster upstreams live there.
-  it.each(["10.0.0.1", "172.16.5.4", "192.168.1.9", "8.8.8.8", "woo-mcp", "woo-mcp.urumi.svc.cluster.local", "[2001:db8::1]"])("allows %s", (host) => {
+  it.each(["10.0.0.1", "10.43.7.9", "100.63.255.255", "100.128.0.1", "172.16.5.4", "192.168.1.9", "8.8.8.8", "woo-mcp", "woo-mcp.urumi.svc.cluster.local", "[2001:db8::1]"])("allows %s", (host) => {
     expect(isBlockedHost(host)).toBe(false);
   });
 

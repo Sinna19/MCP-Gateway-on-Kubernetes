@@ -2,7 +2,7 @@ import dns from "node:dns/promises";
 import net from "node:net";
 
 // Addresses an admin-supplied upstream URL may never point at (SSRF): this machine, the cloud metadata
-// address and other link-local hosts, and "unspecified" (which connects to localhost on Linux).
+// addresses and other link-local hosts, and "unspecified" (which connects to localhost on Linux).
 // Private ranges (10/8, 172.16/12, 192.168/16) stay allowed on purpose: in-cluster upstreams live there.
 const blocked = new net.BlockList();
 blocked.addSubnet("127.0.0.0", 8, "ipv4");
@@ -11,6 +11,9 @@ blocked.addSubnet("169.254.0.0", 16, "ipv4");
 blocked.addAddress("::1", "ipv6");
 blocked.addAddress("::", "ipv6");
 blocked.addSubnet("fe80::", 10, "ipv6");
+blocked.addSubnet("100.64.0.0", 10, "ipv4"); // carrier-grade NAT (Alibaba metadata 100.100.100.200)
+blocked.addSubnet("fc00::", 7, "ipv6"); // unique local (AWS IPv6 metadata fd00:ec2::254)
+blocked.addSubnet("64:ff9b::", 96, "ipv6"); // NAT64: 64:ff9b::a9fe:a9fe reaches 169.254.169.254
 
 type Lookup = (hostname: string) => Promise<Array<{ address: string }>>;
 
