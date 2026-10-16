@@ -17,3 +17,4 @@ The assignment needs at least two upstreams besides woo, and one of them should 
 ## Consequences
 - The bearer token is a second layer next to the NetworkPolicy, not a replacement for it.
 - Rates are fake. That is stated in the tool description's "fixed demo rates" and in the `as_of` field.
+- Conversion rounding uses floats because the rates are fake and static; real money would use integer minor units or a decimal library.

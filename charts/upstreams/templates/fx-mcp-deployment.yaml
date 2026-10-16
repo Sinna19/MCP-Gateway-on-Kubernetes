@@ -18,6 +18,8 @@ spec:
         {{- include "upstreams.labels" . | nindent 8 }}
     spec:
       automountServiceAccountToken: false
+      # Longer than the 10s in-flight drain in src/index.ts.
+      terminationGracePeriodSeconds: 15
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

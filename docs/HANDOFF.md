@@ -1,4 +1,5 @@
 # Handoff
+- **Latest (fx-mcp fix):** graceful 10s drain on SIGTERM, strict PORT validation, grace period 15s, ADR 010 float note. Next step unchanged: notes-mcp, copying fx-mcp.
 
 - **Done this session (phase 4, fx-mcp):**
   - 527d3ac `feat(fx-mcp)`: `services/fx-mcp` (tools `convert_currency`, `list_rates`; static USD table with per-currency minor units; case-insensitive Bearer check; `FX_TOKEN` must be >= 32 chars), chart objects in `charts/upstreams` (Deployment, ClusterIP Service, NetworkPolicy gateway-only, all under an `fx:` block), Secret `fx-mcp-token` in `scripts/secrets.sh`, Makefile (`FX_MCP_TAG`, image import, rollout wait, lint/test), ADR 010.
