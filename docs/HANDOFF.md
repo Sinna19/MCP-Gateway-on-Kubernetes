@@ -1,7 +1,7 @@
 # Handoff
 - **Done this session (phase 5, members and keys):**
   - 4b08633 `feat(dashboard)`: `pages/Members.tsx` (role, disable, per-key revoke, invite with link shown once, pending invites), `pages/Keys.tsx` (generate shown once, revoke), `pages/ShownOnce.tsx` (read-only input, Copy only if `navigator.clipboard`), `pages/AcceptInvite.tsx` (public `/invite/:token`), `acceptInvite` in `auth.tsx`, referrer meta in `index.html`. Tests: `members`, `keys`, `invite` test files; `make lint` and `make test` ok.
-  - 5a7ab6f ADR 014, PLAN line 63 ticked. Nothing pushed.
+  - 5a7ab6f ADR 014, PLAN line 63 ticked.
   - Accept on the cluster (script: scratchpad `accept-members.sh`): 26/26 PASS. Member gets 403 on /members, PATCH, /invites and `/keys?all=true`; `GET /invites` has 0 `/invite/`; full key appears 0 times in any list; second accept of an invite gives 404; revoked key gets 401 on `tools/list` in an open session; disabled member's session and key both give 401.
 - **In progress:** nothing. Not done by me: a look at the Members, My Keys and invite pages in the Vite dev server, and the DevTools check that the key is only in the POST /keys response. Do both once before the demo.
 - **Next step:** `5 audit log` (PLAN line 64: table with user, server, tool, time, duration, outcome, filters).
