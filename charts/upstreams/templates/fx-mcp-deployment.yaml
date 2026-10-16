@@ -1,0 +1,62 @@
+{{- if .Values.fx }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fx-mcp
+  labels:
+    app.kubernetes.io/name: fx-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fx-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fx-mcp
+        {{- include "upstreams.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fx-mcp
+          image: "{{ .Values.fx.image.repository }}:{{ required "fx.image.tag must be set; use make deploy" .Values.fx.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.fx.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.fx.port | quote }}
+            - name: FX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.fx.existingSecret }}
+                  key: token
+          # fx-mcp has no backend, so both probes only check that the process answers.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.fx.resources | nindent 12 }}
+{{- end }}

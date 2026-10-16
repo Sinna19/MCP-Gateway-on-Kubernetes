@@ -1,1 +1,25 @@
-# upstreams values (filled in a later phase)
+# Extra MCP upstreams. Each is ClusterIP only, with a NetworkPolicy that lets only the gateway in.
+# Remove a block (for example `--set fx=null`) and its objects are not rendered.
+fx:
+  image:
+    repository: urumi/fx-mcp
+    # Must be set. `make deploy` passes the tree hash of services/fx-mcp.
+    tag: ""
+
+  port: 3000
+
+  # Secret created by scripts/secrets.sh. Key: token. Read at pod start, so rotating it needs
+  # `kubectl rollout restart deploy/fx-mcp` (ADR 010).
+  existingSecret: fx-mcp-token
+
+  # Pods allowed to reach fx-mcp. Only the gateway.
+  allowedClientLabel:
+    app.kubernetes.io/name: gateway
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

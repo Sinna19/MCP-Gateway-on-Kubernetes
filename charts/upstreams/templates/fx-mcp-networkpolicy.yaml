@@ -1,0 +1,24 @@
+{{- if .Values.fx }}
+# Even with a bearer token, fx-mcp is internal: only the gateway may connect.
+# Once a pod is selected by an Ingress policy, everything not listed here is dropped.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fx-mcp-allow-gateway
+  labels:
+    app.kubernetes.io/name: fx-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: fx-mcp
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.fx.allowedClientLabel | nindent 14 }}
+      ports:
+        - port: {{ .Values.fx.port }}
+          protocol: TCP
+{{- end }}

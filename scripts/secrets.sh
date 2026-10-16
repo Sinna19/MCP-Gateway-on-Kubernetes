@@ -63,6 +63,17 @@ else
   echo "secret gateway-db: created"
 fi
 
+# Bearer token fx-mcp requires on /mcp (32 random bytes as hex = 64 chars; fx-mcp refuses anything under 32).
+# The admin pastes it into the gateway when registering fx. Read it with:
+#   kubectl -n urumi get secret fx-mcp-token -o jsonpath='{.data.token}' | base64 -d
+if kubectl -n "$NS" get secret fx-mcp-token >/dev/null 2>&1; then
+  echo "secret fx-mcp-token: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic fx-mcp-token \
+    --from-literal=token="$(openssl rand -hex 32)" >/dev/null
+  echo "secret fx-mcp-token: created"
+fi
+
 # Gateway app secrets: AES key for upstream credentials (32 bytes, base64) and the bootstrap admin login.
 # Read the admin password with:
 #   kubectl -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d
