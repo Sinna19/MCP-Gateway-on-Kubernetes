@@ -4,7 +4,7 @@ CHARTS := store woo-mcp gateway upstreams platform
 TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
 
 .NOTPARALLEL:
-.PHONY: cluster-up cluster-down images deps secrets deploy lint test dod
+.PHONY: cluster-up cluster-down images deps secrets deploy register lint test dod
 
 cluster-up:
 	scripts/cluster-up.sh
@@ -45,6 +45,10 @@ deploy: deps secrets images
 	kubectl -n $(NS) rollout status deploy/fx-mcp --timeout=180s
 	kubectl -n $(NS) rollout status deploy/notes-mcp --timeout=180s
 	scripts/wait-setup.sh
+
+# Registers fx and notes in the running gateway through its API. Run after make deploy.
+register:
+	scripts/register-upstreams.sh
 
 # Prints failures only, then a one-line summary. eslint/tsc get added with the first TS service.
 lint: deps
