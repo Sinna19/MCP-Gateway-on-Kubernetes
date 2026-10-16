@@ -1,18 +1,21 @@
 # Handoff
-- **Done this session (phase 5, members and keys):**
-  - 4b08633 `feat(dashboard)`: `pages/Members.tsx` (role, disable, per-key revoke, invite with link shown once, pending invites), `pages/Keys.tsx` (generate shown once, revoke), `pages/ShownOnce.tsx` (read-only input, Copy only if `navigator.clipboard`), `pages/AcceptInvite.tsx` (public `/invite/:token`), `acceptInvite` in `auth.tsx`, referrer meta in `index.html`. Tests: `members`, `keys`, `invite` test files; `make lint` and `make test` ok.
-  - 5a7ab6f ADR 014, PLAN line 63 ticked.
-  - Accept on the cluster (script: scratchpad `accept-members.sh`): 26/26 PASS. Member gets 403 on /members, PATCH, /invites and `/keys?all=true`; `GET /invites` has 0 `/invite/`; full key appears 0 times in any list; second accept of an invite gives 404; revoked key gets 401 on `tools/list` in an open session; disabled member's session and key both give 401.
-- **In progress:** nothing. Not done by me: a look at the Members, My Keys and invite pages in the Vite dev server, and the DevTools check that the key is only in the POST /keys response. Do both once before the demo.
-- **Next step:** `5 audit log` (PLAN line 64: table with user, server, tool, time, duration, outcome, filters).
-- **Phase 7 item (record only, not fixed):** revoking a key rejects its next request, but the `/mcp` session object and open SSE stream stay until the 30-min idle timeout, so `list_changed` can still reach a revoked key. See ADR 014.
-- **nginx task (PLAN line 65):** add `Referrer-Policy: no-referrer` header (invite token is in the URL).
+- **Done this session (phase 5, audit log):**
+  - 7c41ca9 `feat(gateway)`: `/api/audit?source=mcp|chat` (zod enum, 400 otherwise), test first.
+  - 99f129e `feat(dashboard)`: `pages/Audit.tsx` (user, source, server, tool, duration, outcome, error; filters server/outcome/source and admin-only user; 50 per page + "Load older" via `before`; request counter drops stale responses; plain-text rendering). `test/audit.test.tsx`, 8 tests. `make lint` and `make test` ok.
+  - 0800000 ADR 015 (keyset paging, member scope in SQL, slug reuse accepted, tool/date filters left as later options). PLAN line 64 ticked.
+  - Cluster accept (scratchpad `accept-audit.sh`): 16/16 PASS. Rows of a deleted server survive for admin and member; member `?user=<admin id>` gets only own rows; `limit=201` 400; `source=x` 400. `source=chat` passes only vacuously (no chat rows until phase 6).
+  - Ash's browser pass: all 5 steps PASS (also covers the Members/Keys visual check and the key-only-in-POST check from last session). Leftover test users are all disabled.
+- **In progress:** nothing.
+- **Next step:** `5 nginx + ingress` (PLAN lines 65-66: dashboard served by nginx in-cluster, Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway and `/` to dashboard, paths from values).
+- **For the nginx task:**
+  - Add `Referrer-Policy: no-referrer` (invite token is in the URL).
+  - Serve a favicon (browser console shows a 404 for it). `/api/me` 401 before login is expected.
+  - SPA fallback to `index.html`; `/invite/:token` is a client route.
+  - Traefik must not buffer SSE on `/mcp` (kubernetes rules).
+- **Phase 7 item (record only):** a revoked key's `/mcp` session and SSE stream live until the 30-min idle timeout (ADR 014).
 - **Gotchas learned:**
-  - A `load()` that clears the error on success wipes the message of a failed write (reload runs right after it). Only the action handler clears errors.
-  - `GET /keys?all=true` gives the owner email only, no id: match to members by email (ADR 014).
-  - Accept scripts: run without a pipe to `tail` or you see nothing until it ends; use `curl --max-time`. Pass keys via `-H @file`, not argv.
-  - Leftover users in the cluster DB: `mk-accept-*@urumi.local` (disabled), plus `dash-test-*` and `srv-accept-*` (members). Disable them from the Members page.
-- **Audit log task, carry-over notes:**
-  - "Audit rows surviving a server delete" is inferred from the schema (no FK, `server_slug` is text): verify live (call a tool on a throwaway server, delete it, rows still show).
-  - Record in the audit ADR: a deleted slug registered again makes old rows look like the new server's. A note is enough.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 64), `services/gateway/src/api/audit.ts`, `apps/dashboard/src/pages/Audit.tsx`, `apps/dashboard/src/pages/Keys.tsx` (`when`, load pattern), `apps/dashboard/test/helpers.tsx`.
+  - In Git Bash, `jq ... | curl --data @-` hung once on login (15s timeout); writing the body to a file and using `--data @file` worked. Use body files in scripts.
+  - `/mcp` replies may be SSE: parse with `sed -e 's/^data: //' -e '/^{/!d'` (the `p;p` form prints each line twice).
+  - Accept scripts that touch secrets: keep them in a `mktemp -d` and `trap rm -rf` on EXIT.
+  - Each accept run leaves one `audit-accept-*` member; disable them in the Members page when convenient.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 5, lines 65-66), `charts/platform` (Ingress template and values), `apps/dashboard/index.html`, `.claude/rules/` chart rules, `deploy/values-local.yaml`.
