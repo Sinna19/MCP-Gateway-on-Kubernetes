@@ -104,7 +104,7 @@ export function Members() {
                       </select>
                     </td>
                     <td>{m.disabled ? "disabled" : "enabled"}</td>
-                    <td>{m.activeKeys}</td>
+                    <td>{m.disabled ? "blocked" : m.activeKeys}</td>
                     <td className="actions">
                       <button disabled={self} onClick={() => void patch(m, { disabled: !m.disabled })}>
                         {m.disabled ? "Enable" : "Disable"}
@@ -117,7 +117,7 @@ export function Members() {
                         "no keys"
                       ) : (
                         <details>
-                          <summary>{theirs.length} keys</summary>
+                          <summary>{theirs.length === 1 ? "1 key" : `${theirs.length} keys`}</summary>
                           <table>
                             <tbody>
                               {theirs.map((k) => (

@@ -42,6 +42,17 @@ describe("members", () => {
     expect(within(row).getByText("1")).toBeInTheDocument();
   });
 
+  it("shows 'blocked' instead of the key count for a disabled member", async () => {
+    const base = gateway();
+    stubApi((path, init) =>
+      path === "/members" && (init.method ?? "GET") === "GET" ? { status: 200, body: [me, { ...bob, disabled: true }] } : base(path, init),
+    );
+    await openMembers();
+    const row = await rowOf(bob.email);
+    expect(within(row).getByText("blocked")).toBeInTheDocument();
+    expect(within(row).queryByText("1")).not.toBeInTheDocument();
+  });
+
   it("role change sends PATCH with the role", async () => {
     const { calls, inits } = stubApi(gateway());
     await openMembers();
@@ -138,6 +149,19 @@ describe("member keys", () => {
     expect(within(keys).getByText(/revoked/i)).toBeInTheDocument();
     // only the active key has a Revoke button
     expect(within(keys).getAllByRole("button", { name: "Revoke" })).toHaveLength(1);
+  });
+
+  it("says '1 key' for one key and 'N keys' for more", async () => {
+    const base = gateway();
+    stubApi((path, init) => (path === "/keys?all=true" ? { status: 200, body: [bobKey] } : base(path, init)));
+    await openMembers();
+    expect(within(await openKeys(bob.email)).getByText("1 key")).toBeInTheDocument();
+  });
+
+  it("says '2 keys' when a member has two", async () => {
+    stubApi(gateway());
+    await openMembers();
+    expect(within(await openKeys(bob.email)).getByText("2 keys")).toBeInTheDocument();
   });
 
   it("Revoke asks first and sends DELETE only after a yes, then reloads", async () => {
