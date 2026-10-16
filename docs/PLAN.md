@@ -52,7 +52,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept:** Claude Code connects with `claude mcp add --transport http urumi http://app.localtest.me/mcp --header "Authorization: Bearer umk_..."` and lists woo tools; revoked key gets 401; `kubectl delete pod` on woo-mcp leaves the endpoint working and the dashboard shows it Unreachable within one health interval (~5s).
 
 ## Phase 4: Extra upstreams
-- [ ] `fx-mcp`: `convert_currency`, `list_rates` (static or cached rates), requires a bearer token (exercises upstream credentials)
+- [x] `fx-mcp`: `convert_currency`, `list_rates` (static or cached rates), requires a bearer token (exercises upstream credentials). Service, chart in `charts/upstreams`, Secret `fx-mcp-token`, ADR 010; not yet registered in the gateway
 - [ ] `notes-mcp`: `add_note`, `list_notes`, plus a tool whose name also exists on woo-mcp to demonstrate the collision scheme
 - [ ] Both registered via the API (or seed), not hardcoded in the gateway
 - **Accept:** a single prompt like "total today's orders and convert to EUR" uses woo and fx tools; both colliding tools appear with distinct prefixed names.
