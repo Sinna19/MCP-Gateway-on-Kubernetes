@@ -1,21 +1,18 @@
 # Handoff
-- **Done this session (phase 5, audit log):**
-  - 7c41ca9 `feat(gateway)`: `/api/audit?source=mcp|chat` (zod enum, 400 otherwise), test first.
-  - 99f129e `feat(dashboard)`: `pages/Audit.tsx` (user, source, server, tool, duration, outcome, error; filters server/outcome/source and admin-only user; 50 per page + "Load older" via `before`; request counter drops stale responses; plain-text rendering). `test/audit.test.tsx`, 8 tests. `make lint` and `make test` ok.
-  - 0800000 ADR 015 (keyset paging, member scope in SQL, slug reuse accepted, tool/date filters left as later options). PLAN line 64 ticked.
-  - Cluster accept (scratchpad `accept-audit.sh`): 16/16 PASS. Rows of a deleted server survive for admin and member; member `?user=<admin id>` gets only own rows; `limit=201` 400; `source=x` 400. `source=chat` passes only vacuously (no chat rows until phase 6).
-  - Ash's browser pass: all 5 steps PASS (also covers the Members/Keys visual check and the key-only-in-POST check from last session). Leftover test users are all disabled.
+- **Done this session (phase 5, nginx + ingress):**
+  - 16c8cc4 `feat(dashboard)`: Members "1 key"/"N keys" and "blocked" for disabled members (test first).
+  - 62893df `feat(dashboard)`: `apps/dashboard/Dockerfile` (node build, nginx-unprivileged 1.31.7-alpine), `nginx.conf` + `security-headers.conf` (SPA fallback, `/assets/` `=404`, gzip, CSP, XFO, nosniff, no-referrer), `data:,` favicon.
+  - Chart commit `feat(charts)`: `charts/dashboard` (Deployment, Service, Ingress `/`), gateway Ingress host/paths from `ingress.*` values, umbrella dependency, Makefile `DASHBOARD_TAG` build/import/deploy/lint.
+  - 91bc48a ADR 016, PLAN lines 65-66 ticked.
+  - Accept (scratchpad `accept-nginx.sh`): 13/14 PASS; the 14th was a regex false positive (`hasCredential` is a boolean, no secret in `/api/servers`). Covers deep links, headers, gzip, asset 404, `/api/me` 401, `/mcp` with member key (10 tools), member 403s, pod uid 101 + read-only fs.
+  - Ash's browser pass at app.localtest.me: all 5 steps PASS, no CSP errors. Phase 5 is complete; Ash tags after the review.
 - **In progress:** nothing.
-- **Next step:** `5 nginx + ingress` (PLAN lines 65-66: dashboard served by nginx in-cluster, Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway and `/` to dashboard, paths from values).
-- **For the nginx task:**
-  - Add `Referrer-Policy: no-referrer` (invite token is in the URL).
-  - Serve a favicon (browser console shows a 404 for it). `/api/me` 401 before login is expected.
-  - SPA fallback to `index.html`; `/invite/:token` is a client route.
-  - Traefik must not buffer SSE on `/mcp` (kubernetes rules).
-- **Phase 7 item (record only):** a revoked key's `/mcp` session and SSE stream live until the 30-min idle timeout (ADR 014).
+- **Next step:** `/phase-review` of phase 5, then Phase 6 (chat agent), PLAN line 69+.
 - **Gotchas learned:**
-  - In Git Bash, `jq ... | curl --data @-` hung once on login (15s timeout); writing the body to a file and using `--data @file` worked. Use body files in scripts.
-  - `/mcp` replies may be SSE: parse with `sed -e 's/^data: //' -e '/^{/!d'` (the `p;p` form prints each line twice).
-  - Accept scripts that touch secrets: keep them in a `mktemp -d` and `trap rm -rf` on EXIT.
-  - Each accept run leaves one `audit-accept-*` member; disable them in the Members page when convenient.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 5, lines 65-66), `charts/platform` (Ingress template and values), `apps/dashboard/index.html`, `.claude/rules/` chart rules, `deploy/values-local.yaml`.
+  - Git Bash mangles `/tmp` in `docker run --tmpfs /tmp`: prefix `MSYS_NO_PATHCONV=1`.
+  - nginx `add_header` is not inherited into a location that sets its own; headers live in one included file. A cache header without `always` skips 404s.
+  - sed again put a literal `\n` in a Makefile recipe; fix with the Edit tool and check `cat -A`.
+  - Dashboard image tag comes from the committed tree of `apps/dashboard`: commit before `make deploy`.
+  - Each accept run leaves a disabled `nginx-accept-*` member (ids 9, 10 so far).
+- **Phase 7 item (record only):** a revoked key's `/mcp` session and SSE stream live until the 30-min idle timeout (ADR 014).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `.claude/rules/gateway.md`, `services/gateway/src` (callTool path).
