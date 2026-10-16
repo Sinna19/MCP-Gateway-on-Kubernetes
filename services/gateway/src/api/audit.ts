@@ -7,6 +7,7 @@ const query = z.object({
   user: z.coerce.number().int().positive().optional(),
   server: z.string().max(20).optional(),
   outcome: z.enum(["ok", "error"]).optional(),
+  source: z.enum(["mcp", "chat"]).optional(),
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
@@ -26,9 +27,10 @@ export function auditRoutes(pool: pg.Pool): Router {
         WHERE ($1::bigint IS NULL OR a.user_id = $1)
           AND ($2::text IS NULL OR a.server_slug = $2)
           AND ($3::text IS NULL OR a.outcome = $3)
-          AND ($4::bigint IS NULL OR a.id < $4)
-        ORDER BY a.id DESC LIMIT $5`,
-      [userId, q.server ?? null, q.outcome ?? null, q.before ?? null, q.limit],
+          AND ($4::text IS NULL OR a.source = $4)
+          AND ($5::bigint IS NULL OR a.id < $5)
+        ORDER BY a.id DESC LIMIT $6`,
+      [userId, q.server ?? null, q.outcome ?? null, q.source ?? null, q.before ?? null, q.limit],
     );
     res.json(
       rows.map((r) => ({

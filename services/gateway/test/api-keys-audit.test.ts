@@ -150,6 +150,21 @@ describe("/api keys and audit", () => {
       expect((await call(base, "/audit?outcome=nope", { cookie: admin })).status).toBe(400);
     });
 
+    it("filters by source and refuses anything but mcp or chat", async () => {
+      await pool.query(
+        `INSERT INTO audit_log (user_id, server_slug, tool, started_at, duration_ms, outcome, source)
+         VALUES ($1, 'woo', 'list_orders', now(), 7, 'ok', 'chat')`,
+        [memberId],
+      );
+      const chat = await call(base, "/audit?source=chat", { cookie: admin });
+      expect(chat.body).toHaveLength(1);
+      expect(chat.body[0]).toMatchObject({ tool: "list_orders", source: "chat" });
+      expect((await call(base, "/audit?source=mcp", { cookie: admin })).body).toHaveLength(4);
+      expect((await call(base, "/audit?source=x", { cookie: admin })).status).toBe(400);
+      // A member's source filter still only sees their own rows.
+      expect((await call(base, "/audit?source=chat", { cookie: member })).body).toHaveLength(1);
+    });
+
     it("pages with limit and before", async () => {
       const first = await call(base, "/audit?limit=3", { cookie: admin });
       expect(first.body).toHaveLength(3);
