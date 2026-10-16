@@ -8,3 +8,13 @@ main { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 .login { display: flex; flex-direction: column; gap: 0.8rem; max-width: 320px; margin: 4rem auto; }
 .login label { display: flex; flex-direction: column; gap: 0.25rem; }
 [role="alert"] { color: #b3261e; margin: 0; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #dde1e6; vertical-align: top; }
+td.actions { white-space: nowrap; display: flex; gap: 0.3rem; }
+.badge { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.85rem; background: #e5e7eb; color: #374151; }
+.badge.connected { background: #d6f0dc; color: #14532d; }
+.badge.unreachable { background: #fadad7; color: #7f1d1d; }
+.panel { display: flex; flex-direction: column; gap: 0.6rem; max-width: 420px; margin-top: 1.5rem; padding: 1rem; background: #fff; border: 1px solid #dde1e6; }
+.panel label { display: flex; flex-direction: column; gap: 0.2rem; }
+.panel fieldset label { flex-direction: row; align-items: center; gap: 0.4rem; }
+.panel fieldset label:has(input:not([type="radio"])) { flex-direction: column; align-items: stretch; }
