@@ -51,15 +51,17 @@ send() {
 
 # register <slug> <url> <auth-json>
 register() {
-  local slug="$1" url="$2" auth="$3" current enabled action
+  local slug="$1" url="$2" auth="$3" current enabled action body
   current="$(list_servers)"
   if [ "$(echo "$current" | jq --arg s "$slug" 'any(.[]; .slug == $s)')" = "true" ]; then
     # PATCH sends url and auth together (the gateway requires it) and leaves `enabled` alone.
     enabled="$(echo "$current" | jq -r --arg s "$slug" '.[] | select(.slug == $s) | .enabled' | tr -d '\r')"
-    U="$url" A="$auth" jq -n '{url:env.U,auth:(env.A|fromjson)}' | send PATCH "/api/servers/$slug"
+    body="$(U="$url" A="$auth" jq -n '{url:env.U,auth:(env.A|fromjson)}')"
+    send PATCH "/api/servers/$slug" <<<"$body" # not a pipe: send sets $code in this shell
     if [ "$enabled" = "false" ]; then action="disabled, left as is"; else action="updated"; fi
   else
-    S="$slug" U="$url" A="$auth" jq -n '{slug:env.S,url:env.U,enabled:true,auth:(env.A|fromjson)}' | send POST "/api/servers"
+    body="$(S="$slug" U="$url" A="$auth" jq -n '{slug:env.S,url:env.U,enabled:true,auth:(env.A|fromjson)}')"
+    send POST "/api/servers" <<<"$body"
     action="created"
   fi
   case "$code" in
