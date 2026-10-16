@@ -12,4 +12,7 @@
   - tsconfig has `noUncheckedIndexedAccess`: `inits[i]` is `T | undefined` in tests.
   - Leftover test users in the cluster DB: `dash-test-*@urumi.local` and `srv-accept-*@urumi.local` (members). Disable them from the Members page.
   - Invite flow for scripts: `POST /api/invites` returns `path` `/invite/<token>`, then `POST /api/invites/<token>/accept {password}`.
+- **Audit log task (PLAN line 64), carry-over notes:**
+  - "Audit rows surviving a server delete" is inferred from the schema only (no FK, `server_slug` is text). The audit task must verify it live: call a tool on a throwaway server, delete the server, confirm the rows still show.
+  - Decide and record in the audit ADR: a deleted slug that is registered again makes old audit rows look like they belong to the new server. A note is enough, no fix.
 - **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 63), `services/gateway/src/api/{invites,users,keys}.ts` (check exact names with Glob), `apps/dashboard/src/pages/{Members,Keys}.tsx`, `apps/dashboard/src/pages/Servers.tsx` (pattern to follow), `apps/dashboard/test/helpers.tsx`.
