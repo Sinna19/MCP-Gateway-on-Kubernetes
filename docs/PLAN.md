@@ -58,7 +58,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept (PASS 2026-10-16, via MCP; re-run in dashboard chat in Phase 6):** a single prompt like "total today's orders and convert to EUR" uses woo and fx tools; both colliding tools appear with distinct prefixed names.
 
 ## Phase 5: Dashboard
-- [ ] Login, role-aware nav
+- [x] Login, role-aware nav (ADR 012; dev via `npm --prefix apps/dashboard run dev`, proxy to app.localtest.me)
 - [ ] Servers page: status badge, tools per server, add / edit / disable / delete (credential field write-only)
 - [ ] Members page: invite, role, revoke keys; My Keys page: generate (show once), revoke
 - [ ] Audit log: table with user, server, tool, time, duration, outcome, filters

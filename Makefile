@@ -2,6 +2,7 @@ SHELL := bash
 NS := urumi
 CHARTS := store woo-mcp gateway upstreams platform
 TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
+TS_PROJECTS := $(addprefix services/,$(TS_SERVICES)) apps/dashboard
 
 .NOTPARALLEL:
 .PHONY: cluster-up cluster-down images deps secrets deploy register lint test dod
@@ -59,16 +60,16 @@ lint: deps
 	for v in local prod; do \
 	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
-	for s in $(TS_SERVICES); do \
-	  out=$$(npm --prefix services/$$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
+	for s in $(TS_PROJECTS); do \
+	  out=$$(npm --prefix $$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
 	if [ $$fail = 0 ]; then echo "lint: ok"; else echo "lint: FAILED"; exit 1; fi
 
 # Dot reporter prints failures only. Add each TS service to TS_SERVICES.
 test:
 	@fail=0; \
-	for s in $(TS_SERVICES); do \
-	  out=$$(npm --prefix services/$$s test 2>&1) || { echo "$$out" | tail -30; fail=1; }; \
+	for s in $(TS_PROJECTS); do \
+	  out=$$(npm --prefix $$s test 2>&1) || { echo "$$out" | tail -30; fail=1; }; \
 	done; \
 	if [ $$fail = 0 ]; then echo "test: ok"; else echo "test: FAILED"; exit 1; fi
 

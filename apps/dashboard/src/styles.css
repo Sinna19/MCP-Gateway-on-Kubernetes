@@ -1,0 +1,10 @@
+body { font-family: system-ui, sans-serif; margin: 0; color: #1c1f24; background: #f6f7f9; }
+main { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
+.topbar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1rem; background: #fff; border-bottom: 1px solid #dde1e6; }
+.topbar nav { display: flex; gap: 1rem; flex: 1; }
+.topbar a { color: #444; text-decoration: none; }
+.topbar a.active { color: #0b5cd5; font-weight: 600; }
+.who { color: #666; font-size: 0.9rem; }
+.login { display: flex; flex-direction: column; gap: 0.8rem; max-width: 320px; margin: 4rem auto; }
+.login label { display: flex; flex-direction: column; gap: 0.25rem; }
+[role="alert"] { color: #b3261e; margin: 0; }
