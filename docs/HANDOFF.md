@@ -6,6 +6,12 @@
   - Checks: `make register` twice -> `created 201` then `updated 200`, both end `fx connected 2 / notes connected 3 / woo connected 5`. `make lint` ok, `make test` ok. Leak check: fx token 0, notes key 0 in gateway logs.
   - Accept PASS via the `urumi` MCP connection: order #18 (19.99 USD, today) -> `woo__list_orders` + `fx__convert_currency` -> 18.39 EUR; audit rows show admin@urumi.local, servers `woo` and `fx`, source `mcp`. `woo__list_products` and `notes__list_products` both listed.
   - PLAN line 57 and the Phase 4 Accept ticked (uncommitted until this handoff commit). Nothing pushed.
+- **Phase 4 review fixes (`/phase-review phase-3`, no Critical/High):**
+  - Fixed, gateway: PATCH `url` without `auth` is now 400 (credential can't follow a URL change); url-guard also blocks `100.64.0.0/10`, `fc00::/7`, `64:ff9b::/96` (10.x still allowed). Tests first, 203 gateway tests pass.
+  - Fixed, `register-upstreams.sh`: plain `sleep 1`; PATCH leaves `enabled` alone (prints `<slug>: disabled, left as is`); non-2xx prints the API `error`; secrets reach jq via env, not `--arg`; refuses non-https `GATEWAY_URL` unless localhost, 127.0.0.1 or `*.localtest.me`; poll timeout prints `slug status tools` to stderr. `make lint`, `make test` ok; `make deploy`, then `make register` twice: `fx: updated`, `notes: updated`, `fx connected 2 / notes connected 3`.
+  - Defended (no change): #4 migration 003 crash-loop, #7 upstream detail in `console.warn`.
+  - Parked: #3 notes prompt injection (Phase 6, chat agent: wrap tool results as untrusted, confirm write tools), #8 upstream egress policy (Phase 7). Put both in `docs/THREAT_MODEL.md` (Phase 9).
+  - Nit #9 (lint `--set` flags on every chart) left as is.
 - **In progress:** nothing. Phase 4 is complete. Chat-agent version of the Accept prompt is re-run in Phase 6.
 - **Next step:** `5 login and role-aware nav` (first Phase 5 checkbox; the dashboard is a big new app, so start in plan mode).
 - **Gotchas learned:**
