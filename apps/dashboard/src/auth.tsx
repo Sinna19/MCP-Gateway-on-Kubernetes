@@ -8,6 +8,7 @@ type AuthState = {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
+  acceptInvite: (token: string, password: string) => Promise<User>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -35,7 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ status, user, login, logout }), [status, user, login, logout]);
+  // The gateway sets the session cookie on accept, so the new user is logged in like after login().
+  const acceptInvite = useCallback(async (token: string, password: string) => {
+    const u = await api<User>(`/invites/${encodeURIComponent(token)}/accept`, { method: "POST", body: { password } });
+    setUser(u);
+    return u;
+  }, []);
+
+  const value = useMemo(() => ({ status, user, login, logout, acceptInvite }), [status, user, login, logout, acceptInvite]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

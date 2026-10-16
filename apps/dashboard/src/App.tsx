@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, homeFor, useAuth } from "./auth";
 import { Layout, RequireAdmin, RequireUser } from "./Layout";
+import { AcceptInvite } from "./pages/AcceptInvite";
 import { Audit } from "./pages/Audit";
 import { Chat } from "./pages/Chat";
 import { Keys } from "./pages/Keys";
@@ -18,6 +19,7 @@ export function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/invite/:token" element={<AcceptInvite />} />
         <Route element={<RequireUser />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
