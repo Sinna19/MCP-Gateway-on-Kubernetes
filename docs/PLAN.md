@@ -59,7 +59,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 
 ## Phase 5: Dashboard
 - [x] Login, role-aware nav (ADR 012; dev via `npm --prefix apps/dashboard run dev`, proxy to app.localtest.me)
-- [ ] Servers page: status badge, tools per server, add / edit / disable / delete (credential field write-only)
+- [x] Servers page: status badge, tools per server, add / edit / disable / delete (credential field write-only)
 - [ ] Members page: invite, role, revoke keys; My Keys page: generate (show once), revoke
 - [ ] Audit log: table with user, server, tool, time, duration, outcome, filters
 - [ ] Served by nginx in-cluster; Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway, `/` to dashboard

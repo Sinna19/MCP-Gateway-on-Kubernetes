@@ -1,16 +1,15 @@
 # Handoff
-- **Done this session (phase 5, login and role-aware nav):**
-  - e39f5ce `feat(dashboard)`: `apps/dashboard` (Vite 8, React 19, react-router-dom 7, plain fetch, plain CSS). `AuthProvider` (`loading|ready`, `/api/me` on load), `api()` with `onUnauthorized` (401 clears user), guards `RequireUser`/`RequireAdmin` ("Loading…", no redirect while loading), post-login redirect to `state.from` else `/servers` (admin) or `/keys` (member). Placeholder pages for Servers, Members, Keys, Audit, Chat.
-  - ADR 012 (stack, Node `^20.19 || >=22.12`, dev proxy, UI guard vs API guard). Makefile `TS_PROJECTS` adds `apps/dashboard` to `lint`/`test` (tsc + eslint, vitest jsdom). 11 dashboard tests; `make lint` and `make test` ok. PLAN line 61 ticked. Nothing pushed.
-  - Live check via Vite proxy (`npm --prefix apps/dashboard run dev`): admin login 200, cookie `HttpOnly; SameSite=Strict`, no Domain; `/api/me` admin. Member (invite + accept): `GET /api/invites` gives 403 `admin only`, no cookie gives 401.
-- **In progress:** nothing. Task complete.
-- **Next step:** `5 servers page` (PLAN line 62: status badge, tools, add/edit/disable/delete, credential write-only).
+- **Done this session (phase 5, servers page):**
+  - 15b9032 `feat(dashboard)`: `pages/Servers.tsx` (list, status badge, tools, add/edit/disable/delete, 5s poll) and `pages/CredentialFields.tsx` (write-only credential: Keep/Replace/Remove). 13 new tests in `test/servers.test.tsx`; `make lint` and `make test` ok.
+  - ADR 013 (poll rules, credential UX, slug read-only, fixed session expiry). PLAN line 62 ticked. Nothing pushed.
+  - Accept via curl on the cluster (script: scratchpad `accept-servers.sh`): member POST/PATCH/DELETE `/api/servers` give 403 `admin only`; member GET has 0 url/hasCredential/headerName keys; random bearer token appears 0 times in POST, PATCH-replace and GET responses. `fx-ui-test` at `http://fx-mcp:3000/mcp` was accepted by url-guard (private ranges allowed), then deleted.
+- **In progress:** nothing. Not done by me: the by-hand DevTools Network check (token only in the create/replace request payload) and a look at the page in the Vite dev server. Do both once before the demo.
+- **Next step:** `5 members and keys` (PLAN line 63: Members page invite / role / revoke keys; My Keys page generate (show once) / revoke).
 - **Gotchas learned:**
-  - A member can `GET /api/servers` by design (`requireUser`): they get slug/enabled/status/tools only. url, headerName and hasCredential are admin-only (`serverView`, `servers.ts:19`). Write routes are `requireAdmin`.
-  - API ids are strings (`"id":"1"`), so `User.id` is `string`.
-  - Test user `dash-test-*@urumi.local` (member) is left in the cluster DB; disable it from the Members page later.
-  - Heredocs with many files failed in one Bash call ("unexpected EOF"): use the Write tool for source files.
-  - Makefile loops do not run `npm ci` for any project (Dockerfiles do); dashboard follows that.
-  - Parked for the nginx/Ingress checkboxes (lines 65-66): ingress paths come from chart values (phase 2 review). Dashboard Dockerfile uses `npm ci`.
-  - If the gateway ever checks Origin, make the Vite dev proxy rewrite it; never allowlist a dev origin in the gateway (ADR 012).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 62), `services/gateway/src/api/servers.ts` (routes, `serverView`, bodies), `apps/dashboard/src/{api.ts,App.tsx,pages/Servers.tsx}`, `apps/dashboard/test/helpers.tsx`.
+  - `tools` in `/api/servers` is `Array<{name, description}>`, not strings. Descriptions are untrusted: show names only.
+  - Sessions expire at a fixed 12h (`sessions.ts:6`), not sliding, so polling does not keep a login alive.
+  - Lint rule `react-hooks/set-state-in-effect` rejects an async function that sets state when called from an effect: write loaders as `.then/.catch` chains (like `auth.tsx`).
+  - tsconfig has `noUncheckedIndexedAccess`: `inits[i]` is `T | undefined` in tests.
+  - Leftover test users in the cluster DB: `dash-test-*@urumi.local` and `srv-accept-*@urumi.local` (members). Disable them from the Members page.
+  - Invite flow for scripts: `POST /api/invites` returns `path` `/invite/<token>`, then `POST /api/invites/<token>/accept {password}`.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 63), `services/gateway/src/api/{invites,users,keys}.ts` (check exact names with Glob), `apps/dashboard/src/pages/{Members,Keys}.tsx`, `apps/dashboard/src/pages/Servers.tsx` (pattern to follow), `apps/dashboard/test/helpers.tsx`.
