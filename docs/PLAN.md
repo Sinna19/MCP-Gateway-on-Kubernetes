@@ -74,7 +74,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
 
 ## Phase 7: DoD run + hardening
-- [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user)
+- [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled.
 - [ ] NetworkPolicies: MariaDB accepts only WordPress + setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`); woo-mcp egress only to store-wordpress + DNS (kube-system CoreDNS)
 - [ ] Full manual rehearsal with users A and B, following the DoD in `docs/ASSIGNMENT.md`
 - [ ] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
