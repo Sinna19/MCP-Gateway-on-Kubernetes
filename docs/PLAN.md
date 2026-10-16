@@ -62,8 +62,8 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [x] Servers page: status badge, tools per server, add / edit / disable / delete (credential field write-only)
 - [x] Members page: invite, role, revoke keys; My Keys page: generate (show once), revoke
 - [x] Audit log: table with user, server, tool, time, duration, outcome, filters
-- [ ] Served by nginx in-cluster; Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway, `/` to dashboard
-- [ ] Ingress paths (`/api`, `/mcp`, `/`) come from values, not hardcoded in the template
+- [x] Served by nginx in-cluster; Ingress `app.localtest.me` routes `/api` and `/mcp` to gateway, `/` to dashboard
+- [x] Ingress paths (`/api`, `/mcp`, `/`) come from values, not hardcoded in the template
 - **Accept:** a member cannot reach admin pages or admin API routes (API test, not just UI); credentials never appear in browser network tab.
 
 ## Phase 6: Chat agent
