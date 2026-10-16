@@ -1,22 +1,16 @@
 # Handoff
-- **Done this session (phase 4, register upstreams):**
-  - 35af58b `feat(scripts)`: `scripts/register-upstreams.sh` + `make register`. Logs in as the bootstrap admin, POST (new) or PATCH (existing, re-enables), polls up to 30s for `connected`, logs out, deletes the cookie jar. Secrets go via stdin, never printed.
-  - 4a4638a `docs(explain)`: fx-mcp and notes-mcp. Rule line added in `.claude/rules/gateway.md`.
-  - SSRF guard checked: `fx-mcp`/`notes-mcp` pass (private ClusterIPs allowed, ADR 009); guard not changed.
-  - Checks: `make register` twice -> `created 201` then `updated 200`, both end `fx connected 2 / notes connected 3 / woo connected 5`. `make lint` ok, `make test` ok. Leak check: fx token 0, notes key 0 in gateway logs.
-  - Accept PASS via the `urumi` MCP connection: order #18 (19.99 USD, today) -> `woo__list_orders` + `fx__convert_currency` -> 18.39 EUR; audit rows show admin@urumi.local, servers `woo` and `fx`, source `mcp`. `woo__list_products` and `notes__list_products` both listed.
-  - PLAN line 57 and the Phase 4 Accept ticked (uncommitted until this handoff commit). Nothing pushed.
-- **Phase 4 review fixes (`/phase-review phase-3`, no Critical/High):**
-  - Fixed, gateway: PATCH `url` without `auth` is now 400 (credential can't follow a URL change); url-guard also blocks `100.64.0.0/10`, `fc00::/7`, `64:ff9b::/96` (10.x still allowed). Tests first, 203 gateway tests pass.
-  - Fixed, `register-upstreams.sh`: plain `sleep 1`; PATCH leaves `enabled` alone (prints `<slug>: disabled, left as is`); non-2xx prints the API `error`; secrets reach jq via env, not `--arg`; refuses non-https `GATEWAY_URL` unless localhost, 127.0.0.1 or `*.localtest.me`; poll timeout prints `slug status tools` to stderr. `make lint`, `make test` ok; `make deploy`, then `make register` twice: `fx: updated`, `notes: updated`, `fx connected 2 / notes connected 3`.
-  - Defended (no change): #4 migration 003 crash-loop, #7 upstream detail in `console.warn`.
-  - Parked: #3 notes prompt injection (Phase 6, chat agent: wrap tool results as untrusted, confirm write tools), #8 upstream egress policy (Phase 7). Put both in `docs/THREAT_MODEL.md` (Phase 9).
-  - Nit #9 (lint `--set` flags on every chart) left as is.
-- **In progress:** nothing. Phase 4 is complete. Chat-agent version of the Accept prompt is re-run in Phase 6.
-- **Next step:** `5 login and role-aware nav` (first Phase 5 checkbox; the dashboard is a big new app, so start in plan mode).
+- **Done this session (phase 5, login and role-aware nav):**
+  - e39f5ce `feat(dashboard)`: `apps/dashboard` (Vite 8, React 19, react-router-dom 7, plain fetch, plain CSS). `AuthProvider` (`loading|ready`, `/api/me` on load), `api()` with `onUnauthorized` (401 clears user), guards `RequireUser`/`RequireAdmin` ("Loading…", no redirect while loading), post-login redirect to `state.from` else `/servers` (admin) or `/keys` (member). Placeholder pages for Servers, Members, Keys, Audit, Chat.
+  - ADR 012 (stack, Node `^20.19 || >=22.12`, dev proxy, UI guard vs API guard). Makefile `TS_PROJECTS` adds `apps/dashboard` to `lint`/`test` (tsc + eslint, vitest jsdom). 11 dashboard tests; `make lint` and `make test` ok. PLAN line 61 ticked. Nothing pushed.
+  - Live check via Vite proxy (`npm --prefix apps/dashboard run dev`): admin login 200, cookie `HttpOnly; SameSite=Strict`, no Domain; `/api/me` admin. Member (invite + accept): `GET /api/invites` gives 403 `admin only`, no cookie gives 401.
+- **In progress:** nothing. Task complete.
+- **Next step:** `5 servers page` (PLAN line 62: status badge, tools, add/edit/disable/delete, credential write-only).
 - **Gotchas learned:**
-  - Today's-order Accept needs an order dated today: woo-mcp has no create-order tool, so place a COD order on `shop.localtest.me` first.
-  - `make test` takes over 2 minutes: run it with `run_in_background`, not a foreground call (a 110s `timeout` kills it with "Error 3840").
-  - notes-mcp notes vanish on restart; add them right before a demo. Registration survives in Postgres.
-  - `docs/THREAT_MODEL.md` does not exist yet (Phase 9); copy the notes cross-user injection line from ADR 011 into it.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 60), `docs/REQUIREMENTS.md` (dashboard part), `services/gateway/src/api/auth.ts` (login/logout shape), `services/gateway/src/api/middleware.ts` (roles).
+  - A member can `GET /api/servers` by design (`requireUser`): they get slug/enabled/status/tools only. url, headerName and hasCredential are admin-only (`serverView`, `servers.ts:19`). Write routes are `requireAdmin`.
+  - API ids are strings (`"id":"1"`), so `User.id` is `string`.
+  - Test user `dash-test-*@urumi.local` (member) is left in the cluster DB; disable it from the Members page later.
+  - Heredocs with many files failed in one Bash call ("unexpected EOF"): use the Write tool for source files.
+  - Makefile loops do not run `npm ci` for any project (Dockerfiles do); dashboard follows that.
+  - Parked for the nginx/Ingress checkboxes (lines 65-66): ingress paths come from chart values (phase 2 review). Dashboard Dockerfile uses `npm ci`.
+  - If the gateway ever checks Origin, make the Vite dev proxy rewrite it; never allowlist a dev origin in the gateway (ADR 012).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 62), `services/gateway/src/api/servers.ts` (routes, `serverView`, bodies), `apps/dashboard/src/{api.ts,App.tsx,pages/Servers.tsx}`, `apps/dashboard/test/helpers.tsx`.
