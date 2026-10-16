@@ -1,14 +1,16 @@
 # Handoff
-- **Done this session (phase 4, notes-mcp):**
-  - 32822fd `feat(notes-mcp)`: `services/notes-mcp` (tools `add_note`, `list_notes`, `list_products`; in-memory `NoteStore`, caps 2000/100/500, list max 50; header `X-Notes-Key`, `NOTES_KEY` >= 32 chars), chart objects under `notes:` in `charts/upstreams`, Secret `notes-mcp-key` (key `key`) in `scripts/secrets.sh`, Makefile (`NOTES_MCP_TAG`, image, rollout wait, lint), ADR 011.
-  - Checks: `make lint` ok, `make test` ok (36 notes tests), `make deploy` ok, notes-mcp 1/1, Service ClusterIP, no Ingress. Gateway-labelled pod: no header 401, header lists the 3 tools. Unlabelled pod: curl exit 7. `--set notes=null` renders 0 notes objects.
-  - PLAN: notes-mcp ticked. Nothing pushed.
-- **In progress:** nothing. Neither fx nor notes is registered in the gateway, so the Phase 4 Accept is not checked.
-- **Next step:** `4 register upstreams` (register woo, fx, notes via the API or a seed script, then run the Accept: woo + fx prompt, and `woo__list_products` + `notes__list_products` both listed).
+- **Done this session (phase 4, register upstreams):**
+  - 35af58b `feat(scripts)`: `scripts/register-upstreams.sh` + `make register`. Logs in as the bootstrap admin, POST (new) or PATCH (existing, re-enables), polls up to 30s for `connected`, logs out, deletes the cookie jar. Secrets go via stdin, never printed.
+  - 4a4638a `docs(explain)`: fx-mcp and notes-mcp. Rule line added in `.claude/rules/gateway.md`.
+  - SSRF guard checked: `fx-mcp`/`notes-mcp` pass (private ClusterIPs allowed, ADR 009); guard not changed.
+  - Checks: `make register` twice -> `created 201` then `updated 200`, both end `fx connected 2 / notes connected 3 / woo connected 5`. `make lint` ok, `make test` ok. Leak check: fx token 0, notes key 0 in gateway logs.
+  - Accept PASS via the `urumi` MCP connection: order #18 (19.99 USD, today) -> `woo__list_orders` + `fx__convert_currency` -> 18.39 EUR; audit rows show admin@urumi.local, servers `woo` and `fx`, source `mcp`. `woo__list_products` and `notes__list_products` both listed.
+  - PLAN line 57 and the Phase 4 Accept ticked (uncommitted until this handoff commit). Nothing pushed.
+- **In progress:** nothing. Phase 4 is complete. Chat-agent version of the Accept prompt is re-run in Phase 6.
+- **Next step:** `5 login and role-aware nav` (first Phase 5 checkbox; the dashboard is a big new app, so start in plan mode).
 - **Gotchas learned:**
-  - Read the key without printing it: `kubectl -n urumi get secret notes-mcp-key -o jsonpath='{.data.key}' | base64 -d` into a variable. Register as a **header** credential, header name `X-Notes-Key`, URL `http://notes-mcp:3000/mcp` (gateway `servers.ts` accepts `type: "header"`).
-  - fx token: secret `fx-mcp-token`, bearer credential, URL `http://fx-mcp:3000/mcp`.
-  - `docs/THREAT_MODEL.md` does not exist yet (Phase 9). The "prompt injection" item is only in `.claude/agents/security-reviewer.md` and `docs/explain/services/woo-mcp/src/tools.ts.md`; the notes cross-user injection line is in ADR 011 to copy into it.
-  - Notes are lost on notes-mcp restart; add them right before a demo.
-  - sed `\t` in an `a` command produced a literal `t` in Makefile; fixed with a second sed (rule updated).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 4, line 54), `services/gateway/src/api/servers.ts` (registration schema), `scripts/` (where a seed script would go), ADR 007 for the expected names.
+  - Today's-order Accept needs an order dated today: woo-mcp has no create-order tool, so place a COD order on `shop.localtest.me` first.
+  - `make test` takes over 2 minutes: run it with `run_in_background`, not a foreground call (a 110s `timeout` kills it with "Error 3840").
+  - notes-mcp notes vanish on restart; add them right before a demo. Registration survives in Postgres.
+  - `docs/THREAT_MODEL.md` does not exist yet (Phase 9); copy the notes cross-user injection line from ADR 011 into it.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 60), `docs/REQUIREMENTS.md` (dashboard part), `services/gateway/src/api/auth.ts` (login/logout shape), `services/gateway/src/api/middleware.ts` (roles).
