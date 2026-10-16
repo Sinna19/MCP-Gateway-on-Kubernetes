@@ -23,3 +23,28 @@ fx:
     limits:
       cpu: 200m
       memory: 128Mi
+
+notes:
+  image:
+    repository: urumi/notes-mcp
+    # Must be set. `make deploy` passes the tree hash of services/notes-mcp.
+    tag: ""
+
+  port: 3000
+
+  # Secret created by scripts/secrets.sh. Key: key (sent by the gateway as the X-Notes-Key header).
+  # Read at pod start, so rotating it needs `kubectl rollout restart deploy/notes-mcp` (ADR 011).
+  existingSecret: notes-mcp-key
+
+  # Pods allowed to reach notes-mcp. Only the gateway.
+  allowedClientLabel:
+    app.kubernetes.io/name: gateway
+
+  # Notes are kept in memory, so there must be exactly one replica (see the Deployment).
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

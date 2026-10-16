@@ -74,6 +74,17 @@ else
   echo "secret fx-mcp-token: created"
 fi
 
+# Static header key notes-mcp requires on /mcp (X-Notes-Key; 32 random bytes as hex; notes-mcp refuses under 32 chars).
+# The admin pastes it into the gateway as a header credential. Read it with:
+#   kubectl -n urumi get secret notes-mcp-key -o jsonpath='{.data.key}' | base64 -d
+if kubectl -n "$NS" get secret notes-mcp-key >/dev/null 2>&1; then
+  echo "secret notes-mcp-key: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic notes-mcp-key \
+    --from-literal=key="$(openssl rand -hex 32)" >/dev/null
+  echo "secret notes-mcp-key: created"
+fi
+
 # Gateway app secrets: AES key for upstream credentials (32 bytes, base64) and the bootstrap admin login.
 # Read the admin password with:
 #   kubectl -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d

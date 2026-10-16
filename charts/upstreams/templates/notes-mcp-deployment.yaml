@@ -1,0 +1,64 @@
+{{- if .Values.notes }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-mcp
+  labels:
+    app.kubernetes.io/name: notes-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notes-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notes-mcp
+        {{- include "upstreams.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      # Longer than the 10s in-flight drain in src/index.ts.
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: notes-mcp
+          image: "{{ .Values.notes.image.repository }}:{{ required "notes.image.tag must be set; use make deploy" .Values.notes.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.notes.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.notes.port | quote }}
+            - name: NOTES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notes.existingSecret }}
+                  key: key
+          # notes-mcp has no backend, so both probes only check that the process answers.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.notes.resources | nindent 12 }}
+{{- end }}

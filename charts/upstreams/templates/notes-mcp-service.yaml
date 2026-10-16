@@ -1,0 +1,17 @@
+{{- if .Values.notes }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-mcp
+  labels:
+    app.kubernetes.io/name: notes-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: notes-mcp
+  ports:
+    - name: http
+      port: {{ .Values.notes.port }}
+      targetPort: http
+{{- end }}

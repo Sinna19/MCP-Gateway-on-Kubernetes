@@ -1,0 +1,24 @@
+{{- if .Values.notes }}
+# Even with a key header, notes-mcp is internal: only the gateway may connect.
+# Once a pod is selected by an Ingress policy, everything not listed here is dropped.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: notes-mcp-allow-gateway
+  labels:
+    app.kubernetes.io/name: notes-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notes-mcp
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.notes.allowedClientLabel | nindent 14 }}
+      ports:
+        - port: {{ .Values.notes.port }}
+          protocol: TCP
+{{- end }}
