@@ -17,3 +17,6 @@ dependencies:
   - name: upstreams
     version: 0.1.0
     repository: file://../upstreams
+  - name: dashboard
+    version: 0.1.0
+    repository: file://../dashboard

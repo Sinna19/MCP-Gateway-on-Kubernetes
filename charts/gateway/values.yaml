@@ -5,8 +5,12 @@ image:
 
 port: 8080
 
-# Ingress host is <host>.<global.domain>. Only /mcp and /api are routed; the dashboard gets / in Phase 5.
-host: app
+# Ingress host is <ingress.host>.<global.domain>. Only these paths are routed to the gateway; the dashboard chart owns "/".
+ingress:
+  host: app
+  paths:
+    - /mcp
+    - /api
 
 # Secrets created by scripts/secrets.sh. Keys: gateway-db/password, gateway-app/{credentials-key,admin-email,admin-password}.
 dbSecret: gateway-db

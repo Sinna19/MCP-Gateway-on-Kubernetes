@@ -1,4 +1,4 @@
-{{- $host := printf "%s.%s" .Values.host .Values.global.domain }}
+{{- $host := printf "%s.%s" .Values.ingress.host .Values.global.domain }}
 # Only /mcp and /api are exposed. /healthz and /readyz stay cluster-internal.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -18,7 +18,7 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
-          {{- range list "/mcp" "/api" }}
+          {{- range .Values.ingress.paths }}
           - path: {{ . }}
             pathType: Prefix
             backend:

@@ -1,0 +1,21 @@
+image:
+  repository: urumi/dashboard
+  # Must be set. `make deploy` passes the tree hash of apps/dashboard.
+  tag: ""
+
+port: 8080
+
+# Ingress host is <host>.<global.domain>, the same host as the gateway. The gateway Ingress owns /api and /mcp;
+# Traefik prefers the longer prefix, so those win over "/".
+ingress:
+  host: app
+  paths:
+    - /
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

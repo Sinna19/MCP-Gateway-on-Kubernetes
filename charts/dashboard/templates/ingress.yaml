@@ -1,0 +1,29 @@
+{{- $host := printf "%s.%s" .Values.ingress.host .Values.global.domain }}
+# Same host as the gateway Ingress; the gateway's longer /api and /mcp prefixes take priority over "/".
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard
+  labels:
+    app.kubernetes.io/name: dashboard
+    {{- include "dashboard.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.global.ingress.className }}
+  {{- if .Values.global.ingress.tls }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: gateway-tls
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard
+                port:
+                  name: http
+          {{- end }}

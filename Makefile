@@ -1,6 +1,6 @@
 SHELL := bash
 NS := urumi
-CHARTS := store woo-mcp gateway upstreams platform
+CHARTS := store woo-mcp gateway upstreams dashboard platform
 TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
 TS_PROJECTS := $(addprefix services/,$(TS_SERVICES)) apps/dashboard
 
@@ -14,11 +14,12 @@ cluster-down:
 	scripts/cluster-down.sh
 
 # Tag = hash of the service directory in git, so it changes only when the service changes.
-# Commit service changes before `make deploy`, or the tag (and the running pod) stays the same.
+# Commit service and dashboard changes before `make images` or `make deploy`, or the tag (and the running pod) stays the same.
 WOO_MCP_TAG := $(shell git rev-parse --short HEAD:services/woo-mcp)
 GATEWAY_TAG := $(shell git rev-parse --short HEAD:services/gateway)
 FX_MCP_TAG := $(shell git rev-parse --short HEAD:services/fx-mcp)
 NOTES_MCP_TAG := $(shell git rev-parse --short HEAD:services/notes-mcp)
+DASHBOARD_TAG := $(shell git rev-parse --short HEAD:apps/dashboard)
 
 # Build service images and import them into k3d (cached builds are fast).
 images:
@@ -30,6 +31,8 @@ images:
 	k3d image import -c urumi urumi/fx-mcp:$(FX_MCP_TAG)
 	docker build -q -t urumi/notes-mcp:$(NOTES_MCP_TAG) services/notes-mcp
 	k3d image import -c urumi urumi/notes-mcp:$(NOTES_MCP_TAG)
+	docker build -q -t urumi/dashboard:$(DASHBOARD_TAG) apps/dashboard
+	k3d image import -c urumi urumi/dashboard:$(DASHBOARD_TAG)
 
 deps:
 	helm dependency update charts/platform >/dev/null
@@ -40,11 +43,13 @@ secrets:
 deploy: deps secrets images
 	helm upgrade --install platform charts/platform -n $(NS) --create-namespace -f deploy/values-local.yaml \
 	  --set woo-mcp.image.tag=$(WOO_MCP_TAG) --set gateway.image.tag=$(GATEWAY_TAG) \
-	  --set upstreams.fx.image.tag=$(FX_MCP_TAG) --set upstreams.notes.image.tag=$(NOTES_MCP_TAG)
+	  --set upstreams.fx.image.tag=$(FX_MCP_TAG) --set upstreams.notes.image.tag=$(NOTES_MCP_TAG) \
+	  --set dashboard.image.tag=$(DASHBOARD_TAG)
 	kubectl -n $(NS) rollout status statefulset/gateway-postgres --timeout=180s
 	kubectl -n $(NS) rollout status deploy/gateway --timeout=180s
 	kubectl -n $(NS) rollout status deploy/fx-mcp --timeout=180s
 	kubectl -n $(NS) rollout status deploy/notes-mcp --timeout=180s
+	kubectl -n $(NS) rollout status deploy/dashboard --timeout=180s
 	scripts/wait-setup.sh
 
 # Registers fx and notes in the running gateway through its API. Run after make deploy.
@@ -58,7 +63,7 @@ lint: deps
 	  out=$$(helm lint charts/$$c -f deploy/values-local.yaml --set image.tag=lint --set fx.image.tag=lint --set notes.image.tag=lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
 	for v in local prod; do \
-	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
+	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint --set dashboard.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
 	for s in $(TS_PROJECTS); do \
 	  out=$$(npm --prefix $$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
