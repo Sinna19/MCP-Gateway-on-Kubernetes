@@ -1,18 +1,18 @@
 # Handoff
-- **Done this session (phase 5, servers page):**
-  - 15b9032 `feat(dashboard)`: `pages/Servers.tsx` (list, status badge, tools, add/edit/disable/delete, 5s poll) and `pages/CredentialFields.tsx` (write-only credential: Keep/Replace/Remove). 13 new tests in `test/servers.test.tsx`; `make lint` and `make test` ok.
-  - ADR 013 (poll rules, credential UX, slug read-only, fixed session expiry). PLAN line 62 ticked. Nothing pushed.
-  - Accept via curl on the cluster (script: scratchpad `accept-servers.sh`): member POST/PATCH/DELETE `/api/servers` give 403 `admin only`; member GET has 0 url/hasCredential/headerName keys; random bearer token appears 0 times in POST, PATCH-replace and GET responses. `fx-ui-test` at `http://fx-mcp:3000/mcp` was accepted by url-guard (private ranges allowed), then deleted.
-- **In progress:** nothing. Not done by me: the by-hand DevTools Network check (token only in the create/replace request payload) and a look at the page in the Vite dev server. Do both once before the demo.
-- **Next step:** `5 members and keys` (PLAN line 63: Members page invite / role / revoke keys; My Keys page generate (show once) / revoke).
+- **Done this session (phase 5, members and keys):**
+  - 4b08633 `feat(dashboard)`: `pages/Members.tsx` (role, disable, per-key revoke, invite with link shown once, pending invites), `pages/Keys.tsx` (generate shown once, revoke), `pages/ShownOnce.tsx` (read-only input, Copy only if `navigator.clipboard`), `pages/AcceptInvite.tsx` (public `/invite/:token`), `acceptInvite` in `auth.tsx`, referrer meta in `index.html`. Tests: `members`, `keys`, `invite` test files; `make lint` and `make test` ok.
+  - 5a7ab6f ADR 014, PLAN line 63 ticked. Nothing pushed.
+  - Accept on the cluster (script: scratchpad `accept-members.sh`): 26/26 PASS. Member gets 403 on /members, PATCH, /invites and `/keys?all=true`; `GET /invites` has 0 `/invite/`; full key appears 0 times in any list; second accept of an invite gives 404; revoked key gets 401 on `tools/list` in an open session; disabled member's session and key both give 401.
+- **In progress:** nothing. Not done by me: a look at the Members, My Keys and invite pages in the Vite dev server, and the DevTools check that the key is only in the POST /keys response. Do both once before the demo.
+- **Next step:** `5 audit log` (PLAN line 64: table with user, server, tool, time, duration, outcome, filters).
+- **Phase 7 item (record only, not fixed):** revoking a key rejects its next request, but the `/mcp` session object and open SSE stream stay until the 30-min idle timeout, so `list_changed` can still reach a revoked key. See ADR 014.
+- **nginx task (PLAN line 65):** add `Referrer-Policy: no-referrer` header (invite token is in the URL).
 - **Gotchas learned:**
-  - `tools` in `/api/servers` is `Array<{name, description}>`, not strings. Descriptions are untrusted: show names only.
-  - Sessions expire at a fixed 12h (`sessions.ts:6`), not sliding, so polling does not keep a login alive.
-  - Lint rule `react-hooks/set-state-in-effect` rejects an async function that sets state when called from an effect: write loaders as `.then/.catch` chains (like `auth.tsx`).
-  - tsconfig has `noUncheckedIndexedAccess`: `inits[i]` is `T | undefined` in tests.
-  - Leftover test users in the cluster DB: `dash-test-*@urumi.local` and `srv-accept-*@urumi.local` (members). Disable them from the Members page.
-  - Invite flow for scripts: `POST /api/invites` returns `path` `/invite/<token>`, then `POST /api/invites/<token>/accept {password}`.
-- **Audit log task (PLAN line 64), carry-over notes:**
-  - "Audit rows surviving a server delete" is inferred from the schema only (no FK, `server_slug` is text). The audit task must verify it live: call a tool on a throwaway server, delete the server, confirm the rows still show.
-  - Decide and record in the audit ADR: a deleted slug that is registered again makes old audit rows look like they belong to the new server. A note is enough, no fix.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 63), `services/gateway/src/api/{invites,users,keys}.ts` (check exact names with Glob), `apps/dashboard/src/pages/{Members,Keys}.tsx`, `apps/dashboard/src/pages/Servers.tsx` (pattern to follow), `apps/dashboard/test/helpers.tsx`.
+  - A `load()` that clears the error on success wipes the message of a failed write (reload runs right after it). Only the action handler clears errors.
+  - `GET /keys?all=true` gives the owner email only, no id: match to members by email (ADR 014).
+  - Accept scripts: run without a pipe to `tail` or you see nothing until it ends; use `curl --max-time`. Pass keys via `-H @file`, not argv.
+  - Leftover users in the cluster DB: `mk-accept-*@urumi.local` (disabled), plus `dash-test-*` and `srv-accept-*` (members). Disable them from the Members page.
+- **Audit log task, carry-over notes:**
+  - "Audit rows surviving a server delete" is inferred from the schema (no FK, `server_slug` is text): verify live (call a tool on a throwaway server, delete it, rows still show).
+  - Record in the audit ADR: a deleted slug registered again makes old rows look like the new server's. A note is enough.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 5, line 64), `services/gateway/src/api/audit.ts`, `apps/dashboard/src/pages/Audit.tsx`, `apps/dashboard/src/pages/Keys.tsx` (`when`, load pattern), `apps/dashboard/test/helpers.tsx`.
