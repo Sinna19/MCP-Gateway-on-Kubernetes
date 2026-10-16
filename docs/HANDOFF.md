@@ -1,16 +1,14 @@
 # Handoff
-- **Latest (fx-mcp fix):** graceful 10s drain on SIGTERM, strict PORT validation, grace period 15s, ADR 010 float note. Next step unchanged: notes-mcp, copying fx-mcp.
-
-- **Done this session (phase 4, fx-mcp):**
-  - 527d3ac `feat(fx-mcp)`: `services/fx-mcp` (tools `convert_currency`, `list_rates`; static USD table with per-currency minor units; case-insensitive Bearer check; `FX_TOKEN` must be >= 32 chars), chart objects in `charts/upstreams` (Deployment, ClusterIP Service, NetworkPolicy gateway-only, all under an `fx:` block), Secret `fx-mcp-token` in `scripts/secrets.sh`, Makefile (`FX_MCP_TAG`, image import, rollout wait, lint/test), ADR 010.
-  - Checks: `make lint` ok, `make test` ok (26 fx tests), `make deploy` ok, fx-mcp 1/1 Ready, Service ClusterIP and no Ingress, image present in k3d. Gateway-labelled pod: no token 401, token 200. Unlabelled pod: curl exit 7. `helm template charts/upstreams --set fx=null` renders 0 objects, exit 0.
-  - PLAN: fx-mcp ticked. Nothing pushed.
-- **In progress:** nothing. fx-mcp is deployed but NOT registered in the gateway, so the Phase 4 Accept (woo + fx prompt) is not checked yet.
-- **Next step:** `4 notes-mcp` (service + tests + chart, same shape as fx-mcp; a tool name that also exists on woo-mcp, e.g. `list_products`... pick one for the collision demo). Registration of both via the API is a later session.
+- **Done this session (phase 4, notes-mcp):**
+  - 32822fd `feat(notes-mcp)`: `services/notes-mcp` (tools `add_note`, `list_notes`, `list_products`; in-memory `NoteStore`, caps 2000/100/500, list max 50; header `X-Notes-Key`, `NOTES_KEY` >= 32 chars), chart objects under `notes:` in `charts/upstreams`, Secret `notes-mcp-key` (key `key`) in `scripts/secrets.sh`, Makefile (`NOTES_MCP_TAG`, image, rollout wait, lint), ADR 011.
+  - Checks: `make lint` ok, `make test` ok (36 notes tests), `make deploy` ok, notes-mcp 1/1, Service ClusterIP, no Ingress. Gateway-labelled pod: no header 401, header lists the 3 tools. Unlabelled pod: curl exit 7. `--set notes=null` renders 0 notes objects.
+  - PLAN: notes-mcp ticked. Nothing pushed.
+- **In progress:** nothing. Neither fx nor notes is registered in the gateway, so the Phase 4 Accept is not checked.
+- **Next step:** `4 register upstreams` (register woo, fx, notes via the API or a seed script, then run the Accept: woo + fx prompt, and `woo__list_products` + `notes__list_products` both listed).
 - **Gotchas learned:**
-  - Read the fx token without printing it: `kubectl -n urumi get secret fx-mcp-token -o jsonpath='{.data.token}' | base64 -d` into a variable. Register it in the gateway as a bearer credential (URL `http://fx-mcp:3000/mcp`).
-  - NetworkPolicy proof used two curl pods (labelled and unlabelled) plus a ~12s wait; unlabelled gave exit 7.
-  - A big multi-file bash heredoc failed to parse in the Bash tool; use the Write tool for several files.
-  - The Makefile Python patch inserted a literal `\n`; check `cat -A` on Makefile recipe lines after scripted edits.
-  - Rotating a token Secret needs `kubectl rollout restart` (env var), noted in ADR 010.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 4, line 54), `services/fx-mcp/` (template), `charts/upstreams/` (add a `notes:` block + templates), `Makefile`, `scripts/secrets.sh` only if notes needs a token, `docs/decisions/007-tool-naming.md` for the collision scheme.
+  - Read the key without printing it: `kubectl -n urumi get secret notes-mcp-key -o jsonpath='{.data.key}' | base64 -d` into a variable. Register as a **header** credential, header name `X-Notes-Key`, URL `http://notes-mcp:3000/mcp` (gateway `servers.ts` accepts `type: "header"`).
+  - fx token: secret `fx-mcp-token`, bearer credential, URL `http://fx-mcp:3000/mcp`.
+  - `docs/THREAT_MODEL.md` does not exist yet (Phase 9). The "prompt injection" item is only in `.claude/agents/security-reviewer.md` and `docs/explain/services/woo-mcp/src/tools.ts.md`; the notes cross-user injection line is in ADR 011 to copy into it.
+  - Notes are lost on notes-mcp restart; add them right before a demo.
+  - sed `\t` in an `a` command produced a literal `t` in Makefile; fixed with a second sed (rule updated).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 4, line 54), `services/gateway/src/api/servers.ts` (registration schema), `scripts/` (where a seed script would go), ADR 007 for the expected names.

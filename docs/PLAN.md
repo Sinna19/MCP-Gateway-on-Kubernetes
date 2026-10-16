@@ -53,7 +53,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 
 ## Phase 4: Extra upstreams
 - [x] `fx-mcp`: `convert_currency`, `list_rates` (static or cached rates), requires a bearer token (exercises upstream credentials). Service, chart in `charts/upstreams`, Secret `fx-mcp-token`, ADR 010; not yet registered in the gateway
-- [ ] `notes-mcp`: `add_note`, `list_notes`, plus a tool whose name also exists on woo-mcp to demonstrate the collision scheme
+- [x] `notes-mcp`: `add_note`, `list_notes`, plus a tool whose name also exists on woo-mcp to demonstrate the collision scheme. In-memory, `X-Notes-Key` header, colliding tool `list_products`, Secret `notes-mcp-key`, ADR 011; not yet registered in the gateway
 - [ ] Both registered via the API (or seed), not hardcoded in the gateway
 - **Accept:** a single prompt like "total today's orders and convert to EUR" uses woo and fx tools; both colliding tools appear with distinct prefixed names.
 
