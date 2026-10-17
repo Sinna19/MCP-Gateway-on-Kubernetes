@@ -11,6 +11,10 @@ export type { LlmFn } from "./types.js";
 const MAX_HISTORY = 20;
 const SUMMARY_CHARS = 200;
 const ONE_WRITE = "not run: confirm one write at a time";
+const MAX_CALLS_PER_STEP = 5;
+const TOO_MANY = "not run: too many tool calls in one step";
+const OUT_OF_TIME = "not run: out of time";
+const STOPPED = "This took too long, so I stopped. Ask again to continue.";
 
 // What the agent needs from the Gateway class (the same object /mcp uses).
 export interface ChatGateway {
@@ -26,6 +30,7 @@ export interface AgentOptions {
   maxSteps?: number;
   llmTimeoutMs?: number;
   budgetMs?: number;
+  now?: () => number; // tests move the clock to hit the deadline
 }
 
 export interface ChatInput {
@@ -80,11 +85,13 @@ export class ChatAgent {
   private readonly maxSteps: number;
   private readonly llmTimeoutMs: number;
   private readonly budgetMs: number;
+  private readonly now: () => number;
 
   constructor(private readonly options: AgentOptions) {
     this.maxSteps = options.maxSteps ?? 8;
     this.llmTimeoutMs = options.llmTimeoutMs ?? 20_000;
     this.budgetMs = options.budgetMs ?? 55_000;
+    this.now = options.now ?? Date.now;
   }
 
   // One request per user at a time, so a stuck tab cannot keep spending LLM credits.
@@ -100,7 +107,7 @@ export class ChatAgent {
   }
 
   private async runTurn({ user, messages, confirm }: ChatInput): Promise<ChatResult> {
-    const deadline = Date.now() + this.budgetMs;
+    const deadline = this.now() + this.budgetMs;
     const toolCalls: ToolCallView[] = [];
     let convo: ChatMessage[];
     let turnStart: number;
@@ -112,12 +119,14 @@ export class ChatAgent {
       convo = entry.messages;
       turnStart = entry.turnStart;
       if (confirm.approve) {
-        await this.execute(user, entry.tool, entry.args, entry.toolCallId, convo, toolCalls);
+        await this.execute(user, entry.tool, entry.args, entry.toolCallId, convo, toolCalls, deadline);
       } else {
         convo.push({ role: "tool", tool_call_id: entry.toolCallId, content: "user declined" });
         toolCalls.push({ tool: entry.tool, args: entry.args, ok: false, summary: "declined by the user" });
       }
     } else {
+      // A new message supersedes anything still waiting for a click.
+      this.options.pending.clearUser(user.id);
       convo = sanitizeHistory(messages);
       turnStart = convo.length;
     }
@@ -128,8 +137,8 @@ export class ChatAgent {
     };
 
     for (let step = 0; step < this.maxSteps; step++) {
-      const left = deadline - Date.now();
-      if (left <= 0) return finish("This took too long, so I stopped. Ask again to continue.", true);
+      const left = deadline - this.now();
+      if (left <= 0) return finish(STOPPED, true);
       const tools = this.options.gateway.listTools();
       const signal = AbortSignal.any([AbortSignal.timeout(this.llmTimeoutMs), AbortSignal.timeout(left)]);
 
@@ -149,18 +158,20 @@ export class ChatAgent {
 
       const known = new Set(tools.map((t) => t.name));
       let pendingCall: { call: ToolCall; args: Record<string, unknown> } | null = null;
-      for (const call of calls) {
+      for (const [i, call] of calls.entries()) {
         const name = call.function.name;
         const args = parseArgs(call);
-        if (!args) {
-          this.refuse(convo, toolCalls, call, {}, "invalid arguments: must be a JSON object");
+        if (i >= MAX_CALLS_PER_STEP) {
+          this.refuse(convo, toolCalls, name, call.id, args ?? {}, TOO_MANY);
+        } else if (!args) {
+          this.refuse(convo, toolCalls, name, call.id, {}, "invalid arguments: must be a JSON object");
         } else if (this.options.readOnlyTools.has(name) || !known.has(name)) {
           // Unknown names go through callTool too: it answers with an error and audits the attempt.
-          await this.execute(user, name, args, call.id, convo, toolCalls);
+          await this.execute(user, name, args, call.id, convo, toolCalls, deadline);
         } else if (!pendingCall) {
           pendingCall = { call, args };
         } else {
-          this.refuse(convo, toolCalls, call, args, ONE_WRITE);
+          this.refuse(convo, toolCalls, name, call.id, args, ONE_WRITE);
         }
       }
       if (pendingCall) {
@@ -172,14 +183,16 @@ export class ChatAgent {
     return finish(`I stopped after ${this.maxSteps} steps without a final answer.`, true);
   }
 
-  private async execute(user: AuthUser, name: string, args: Record<string, unknown>, callId: string, convo: ChatMessage[], views: ToolCallView[]): Promise<void> {
+  private async execute(user: AuthUser, name: string, args: Record<string, unknown>, callId: string, convo: ChatMessage[], views: ToolCallView[], deadline: number): Promise<void> {
+    // Checked before every call: a step with several slow calls cannot run past the budget.
+    if (this.now() >= deadline) return this.refuse(convo, views, name, callId, args, OUT_OF_TIME);
     const result = await this.options.gateway.callTool(user, name, args, "chat");
     convo.push({ role: "tool", tool_call_id: callId, content: wrapToolResult(name, result) });
     views.push({ tool: name, args, ok: !result.isError, summary: cleanText(resultText(result), SUMMARY_CHARS) });
   }
 
-  private refuse(convo: ChatMessage[], views: ToolCallView[], call: ToolCall, args: Record<string, unknown>, why: string): void {
-    convo.push({ role: "tool", tool_call_id: call.id, content: why });
-    views.push({ tool: call.function.name.slice(0, 100), args, ok: false, summary: why });
+  private refuse(convo: ChatMessage[], views: ToolCallView[], name: string, callId: string, args: Record<string, unknown>, why: string): void {
+    convo.push({ role: "tool", tool_call_id: callId, content: why });
+    views.push({ tool: name.slice(0, 100), args, ok: false, summary: why });
   }
 }

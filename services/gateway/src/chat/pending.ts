@@ -43,6 +43,11 @@ export class PendingStore {
     return found;
   }
 
+  // Called when the user sends a new message: older proposals no longer match the conversation.
+  clearUser(userId: number): void {
+    for (const [id, e] of this.entries) if (e.userId === userId) this.entries.delete(id);
+  }
+
   size(): number {
     this.sweep();
     return this.entries.size;

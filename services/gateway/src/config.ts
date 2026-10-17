@@ -29,8 +29,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     callTimeoutMs: Number(env.CALL_TIMEOUT_MS ?? 15_000),
     healthIntervalMs: Number(env.HEALTH_INTERVAL_MS ?? 5_000),
     cookieSecure: env.COOKIE_SECURE === "true",
-    // The chart renders empty strings when chat is not set up, so empty counts as unset.
-    llm: env.LLM_BASE_URL && env.LLM_MODEL && env.LLM_API_KEY ? { baseUrl: env.LLM_BASE_URL, model: env.LLM_MODEL, apiKey: env.LLM_API_KEY } : undefined,
+    llm: loadLlm(env),
     chatReadOnlyTools: new Set((env.CHAT_READ_ONLY_TOOLS ?? "").split(",").map((t) => t.trim()).filter(Boolean)),
   };
+}
+
+// The chart renders empty strings when chat is not set up, so empty counts as unset.
+// The bearer key goes to this URL, so it must be https (or LLM_ALLOW_HTTP=true). A bad URL
+// disables chat with an error in the log; it must not stop the gateway from starting.
+function loadLlm(env: NodeJS.ProcessEnv): Config["llm"] {
+  if (!env.LLM_BASE_URL || !env.LLM_MODEL || !env.LLM_API_KEY) return undefined;
+  let protocol = "";
+  try {
+    protocol = new URL(env.LLM_BASE_URL).protocol;
+  } catch {
+    console.error("chat disabled: LLM_BASE_URL is not a valid URL");
+    return undefined;
+  }
+  if (protocol !== "https:" && !(protocol === "http:" && env.LLM_ALLOW_HTTP === "true")) {
+    console.error("chat disabled: LLM_BASE_URL must be https (set LLM_ALLOW_HTTP=true to allow http)");
+    return undefined;
+  }
+  return { baseUrl: env.LLM_BASE_URL, model: env.LLM_MODEL, apiKey: env.LLM_API_KEY };
 }
