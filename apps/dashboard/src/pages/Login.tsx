@@ -13,14 +13,15 @@ export function Login() {
   const [error, setError] = useState("");
 
   // Already logged in (page reload on /login): skip the form.
-  if (status === "ready" && user) return <Navigate to={from?.pathname ?? homeFor(user)} replace />;
+  const back = from ? `${from.pathname}${from.search ?? ""}` : null;
+  if (status === "ready" && user) return <Navigate to={back ?? homeFor(user)} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
     try {
       const u = await login(email, password);
-      navigate(from ? `${from.pathname}${from.search ?? ""}` : homeFor(u), { replace: true });
+      navigate(back ?? homeFor(u), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "login failed");
     }

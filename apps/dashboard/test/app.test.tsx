@@ -116,3 +116,44 @@ describe("api()", () => {
     await waitFor(() => expect(inits[0]?.credentials).toBe("same-origin"));
   });
 });
+
+describe("api() on non-JSON bodies", () => {
+  it("turns an HTML 502 into a readable error", async () => {
+    stubApi(() => ({ status: 502, raw: "<html>Bad Gateway</html>" }));
+    await expect(api("/keys")).rejects.toMatchObject({ status: 502, message: "request failed (502)" });
+  });
+
+  it("still returns to the login form on an HTML 401", async () => {
+    stubApi((path) => (path === "/me" ? { status: 200, body: admin } : { status: 401, raw: "<html>nope</html>" }));
+    renderAt("/audit");
+    await screen.findByRole("heading", { name: "Audit log" });
+    await api("/audit").catch(() => {});
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+  });
+});
+
+describe("logout failures", () => {
+  it("stays logged in and says so when the gateway answers 500", async () => {
+    stubApi((path) => (path === "/auth/logout" ? { status: 500, body: { error: "boom" } } : gateway(admin)(path)));
+    renderAt("/servers");
+    await userEvent.click(await screen.findByRole("button", { name: "Log out" }));
+    expect(await screen.findByText("Logout failed, try again")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+  });
+
+  it("stays logged in on a network error", async () => {
+    stubApi(gateway(admin));
+    renderAt("/servers");
+    await screen.findByRole("button", { name: "Log out" });
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+    expect(await screen.findByText("Logout failed, try again")).toBeInTheDocument();
+  });
+
+  it("treats 401 as already logged out", async () => {
+    stubApi((path) => (path === "/auth/logout" ? { status: 401, body: { error: "not logged in" } } : gateway(admin)(path)));
+    renderAt("/servers");
+    await userEvent.click(await screen.findByRole("button", { name: "Log out" }));
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+  });
+});

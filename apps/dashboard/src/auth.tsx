@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, setOnUnauthorized } from "./api";
+import { api, ApiError, setOnUnauthorized } from "./api";
 
 export type User = { id: string; email: string; role: "admin" | "member" };
 
@@ -32,7 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await api("/auth/logout", { method: "POST" }).catch(() => {});
+    try {
+      await api("/auth/logout", { method: "POST" });
+    } catch (err) {
+      // 401 means the session is already gone. Anything else (network, 5xx): the cookie may still be valid, so stay logged in.
+      if (!(err instanceof ApiError && err.status === 401)) throw new Error("Logout failed, try again");
+    }
     setUser(null);
   }, []);
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./auth";
 
@@ -20,6 +21,11 @@ export function RequireAdmin() {
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
+  const onLogout = () => {
+    setLogoutError("");
+    logout().catch((err: unknown) => setLogoutError(err instanceof Error ? err.message : "Logout failed, try again"));
+  };
   return (
     <>
       <header className="topbar">
@@ -33,8 +39,9 @@ export function Layout() {
         <span className="who">
           {user?.email} ({user?.role})
         </span>
-        <button onClick={() => void logout()}>Log out</button>
+        <button onClick={onLogout}>Log out</button>
       </header>
+      {logoutError && <p role="alert">{logoutError}</p>}
       <main>
         <Outlet />
       </main>

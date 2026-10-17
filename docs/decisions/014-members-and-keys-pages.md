@@ -19,3 +19,6 @@ Status: accepted. Dashboard only; no gateway change.
 
 ## Known gap (phase 7)
 Revoking a key rejects its next request, even inside an open `/mcp` session (verified: 401 on `tools/list`). The session object and any open SSE stream are not closed until the 30-minute idle timeout, so a revoked key may still receive `list_changed` notifications until then.
+
+## Known limitation: invite token in the URL path
+The invite link is `/invite/<token>`, so the token lands in gateway and Traefik access logs and in browser history. Mitigations: the token is single-use and expires, and `no-referrer` stops it leaking to other sites. Whoever can read those logs or history before the invitee accepts could accept first; recorded for THREAT_MODEL.md.

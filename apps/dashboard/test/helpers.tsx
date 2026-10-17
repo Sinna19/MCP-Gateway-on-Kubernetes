@@ -3,7 +3,8 @@ import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { App } from "../src/App";
 
-export type Reply = { status: number; body?: unknown };
+// `raw` sends a non-JSON body (an HTML error page from Traefik, say) instead of `body`.
+export type Reply = { status: number; body?: unknown; raw?: string };
 export type Handler = (path: string, init: RequestInit) => Reply | Promise<Reply>;
 
 // Stubs fetch. Every call is recorded as "METHOD /path" in `calls`.
@@ -17,6 +18,7 @@ export function stubApi(handler: Handler) {
       calls.push(`${init.method ?? "GET"} ${path}`);
       inits.push(init);
       const reply = await handler(path, init);
+      if (reply.raw !== undefined) return new Response(reply.raw, { status: reply.status, headers: { "Content-Type": "text/html" } });
       return new Response(reply.status === 204 ? null : JSON.stringify(reply.body ?? {}), {
         status: reply.status,
         headers: { "Content-Type": "application/json" },

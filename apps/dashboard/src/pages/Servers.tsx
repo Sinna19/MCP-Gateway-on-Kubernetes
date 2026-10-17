@@ -72,10 +72,10 @@ export function Servers() {
     await load(true);
   }
 
-  const toggle = (s: Server) => run(() => api(`/servers/${s.slug}`, { method: "PATCH", body: { enabled: !s.enabled } }));
+  const toggle = (s: Server) => run(() => api(`/servers/${encodeURIComponent(s.slug)}`, { method: "PATCH", body: { enabled: !s.enabled } }));
   const remove = (s: Server) => {
     if (!window.confirm(`Delete server '${s.slug}'? Its audit history is kept.`)) return Promise.resolve();
-    return run(() => api(`/servers/${s.slug}`, { method: "DELETE" }));
+    return run(() => api(`/servers/${encodeURIComponent(s.slug)}`, { method: "DELETE" }));
   };
 
   return (

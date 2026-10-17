@@ -26,3 +26,4 @@ The dashboard so far ran only through `vite dev`. It must be served in-cluster a
 - Dashboard changes need an image rebuild (no hot reload); `vite dev` stays the fast loop.
 - The strict CSP forbids inline scripts and styles. If a library needs them, fix the library use rather than loosen the policy.
 - Interview line: "Same host, two Ingresses, Traefik picks the longest prefix; the SPA fallback is nginx's job and assets 404 properly."
+- The dashboard and gateway Ingresses share the `gateway-tls` secret for the same host. Any future cert-manager annotations must go on both Ingresses or neither, or one Ingress would own the secret alone.

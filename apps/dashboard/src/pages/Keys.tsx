@@ -53,7 +53,7 @@ export function Keys() {
     if (!window.confirm(`Revoke key '${k.name}' (${k.prefix}…)? Anything using it stops working.`)) return;
     setError("");
     try {
-      await api(`/keys/${k.id}`, { method: "DELETE" });
+      await api(`/keys/${encodeURIComponent(k.id)}`, { method: "DELETE" });
     } catch (err) {
       setError(messageOf(err));
     }

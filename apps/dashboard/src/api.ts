@@ -20,7 +20,13 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // A proxy error page (Traefik 502/504) is HTML, not JSON. Treat it as "no body" so the status still decides what happens.
+  let data: { error?: string } | null = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = {};
+  }
   if (!res.ok) {
     // /me is how AuthProvider asks "am I logged in?", and a wrong password is also a 401: neither is an expiry.
     if (res.status === 401 && !path.startsWith("/auth/") && path !== "/me") onUnauthorized();
