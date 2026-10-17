@@ -1,19 +1,15 @@
 # Handoff
-- **Done this session (phase 6d, Phase 6 Accept on the cluster; Ash did the browser clicks):**
-  - Users: A = member-a@urumi.local (id 12), B = member-b@urumi.local (id 13), created through the dashboard invite flow. Today's COD order #21, 9.00 USD, processing. WordPress timezone is UTC (gmt_offset 0), same as Postgres.
-  - 1 PASS: A created "Phase6 Widget 6230" 19.99 via the Confirm card; `/product/phase6-widget-6230/` 200; audit 16 `woo create_product ok chat` A.
-  - 2 PASS: "what orders came in today" returned #21, no confirm card; audit 17 `list_orders` A.
-  - 3 PASS: total + EUR = 8.28 (rate 0.92); audit 18 `list_orders`, 19 `fx convert_currency`.
-  - 4 PASS: B added the injection note (audit 20 `notes add_note` B, confirmed). A's "summarise my notes" quoted it (shared notes, ADR 011) and only ran `list_notes` (audit 21); no update_order_status proposed or audited; orders #21/#18/#14 still `wc-processing`.
-  - 5 PASS: admin disabled fx → A's "convert 10 USD to EUR" said it can't convert, no tool (log `tools=-`, no fx audit row); re-enabled → audit 22 `fx convert_currency ok`.
-  - ec4bc15 fix(dashboard): logout was broken for everyone. `api()` sent no Content-Type on a POST with no body, so the gateway's JSON-only rule answered 415 (proved with curl before the fix). `api()` now sends `{}` on POST/PATCH/PUT without a body; 2 tests. Logout verified in the browser for A, B and admin; A's and B's current sessions deleted.
-  - 6 PASS: `make lint` ok, `make test` ok.
-- **In progress:** nothing.
-- **Next step:** /phase-review phase-5 (phase 6 review), then fixes, tag phase-6, /explain chat agent, then Phase 7.
+- **Done this session (phase-6 review fixes, from /phase-review phase-5):**
+  - 242ef25 fix(gateway): max 5 tool calls per LLM step (extras answered "not run: too many tool calls in one step"); deadline checked before every `callTool` incl. the post-confirm one (ends with the "stopped" reply); `LLM_BASE_URL` must be https unless `LLM_ALLOW_HTTP=true` (else log error, chat 503, gateway still starts); a new non-confirm message calls `PendingStore.clearUser`; tool list sent to the LLM capped at 64 KB (skipped names logged once), schema `title` cleaned, `examples`/`default` dropped (not when they are property names).
+  - a27dbc2 fix(dashboard): confirm card has Confirm/Decline above the args; displayed args cut at 2 KB "(truncated, N chars)".
+  - docs commit: ADR 018 updated (limits, audit scope, 4 THREAT_MODEL lines for phase 9); `.claude/rules/gateway.md` notes LLM_ALLOW_HTTP.
+  - `make lint` ok, `make test` ok, `make images && make deploy` ok. Live check: admin "list products" via `POST /api/chat` ran `woo__list_products` ok, 7 products in the reply.
+  - Review result: k8s reviewer found nothing real; security findings #1-#6 fixed or documented as above.
+- **In progress:** nothing. Ash tags phase-6 himself.
+- **Next step:** `/explain chat agent`, then `/phase 7 dod-check script` (first Phase 7 checkbox).
 - **Gotchas learned:**
-  - Logout is the only call without a body; every other write sends one. DELETE isn't checked by `requireJsonBody`.
-  - Logout only ends the current session; older sessions (invite accept, earlier curl runs) stay until they expire. Admin has 5 such sessions.
-  - Chat replies sometimes use "- " lists. That's plain text, accepted.
-  - Image tags are tree hashes (`git rev-parse HEAD:<dir>`), so commit before `make deploy`; check the running pod with `kubectl exec ... grep`.
-  - Audit check: `kubectl -n urumi exec gateway-postgres-0 -- psql` on `audit_log` joined to `users`. Woo orders are in `wp_posts` (`post_type=shop_order`, no HPOS table); totals in `wp_postmeta`.
-  - No browser tool in Claude Code sessions here, so UI passes are done by Ash.
+  - Python heredocs with `'''` strings in Git Bash broke once; write the patch script with the Write tool and run it instead.
+  - Agent tests move time with the new `now` option on `AgentOptions`; the `budgetMs: 0` trick tests "confirm after deadline".
+  - `eslint` warns about an unused `no-control-regex` disable at `services/gateway/src/chat/prompt.ts:17` (pre-existing, harmless).
+  - Parked for phase 7: audit `args` column and `declined` rows (ADR 018).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 7), `docs/REQUIREMENTS.md`, `scripts/dod-check.sh` (if it exists), `Makefile`, `scripts/register-upstreams.sh`.
