@@ -14,7 +14,7 @@ paths:
 - **Audit**: every tool call (MCP endpoint and chat) writes user, server, tool, started_at, duration_ms, outcome, error, source (`mcp` | `chat`) in a `finally` block.
 - **Disabled servers**: tools vanish from `tools/list`, calls rejected, `notifications/tools/list_changed` sent to open sessions.
 - **Roles**: `admin` and `member`, enforced server-side on every route.
-- **Chat agent**: `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` (empty = unset; Secret `llm-api` key `api-key`, optional) and `CHAT_READ_ONLY_TOOLS` (comma list, empty = confirm everything) are read in `src/config.ts`; `createApp` builds one `ChatAgent` only if `llm` is given, else `/api/chat` answers 503. Uses the same `callTool(user, name, args)` as `/mcp`. Tool descriptions and results are untrusted text.
+- **Chat agent**: `LLM_BASE_URL` (https only unless `LLM_ALLOW_HTTP=true`, else chat stays off)/`LLM_MODEL`/`LLM_API_KEY` (empty = unset; Secret `llm-api` key `api-key`, optional) and `CHAT_READ_ONLY_TOOLS` (comma list, empty = confirm everything) are read in `src/config.ts`; `createApp` builds one `ChatAgent` only if `llm` is given, else `/api/chat` answers 503. Uses the same `callTool(user, name, args)` as `/mcp`. Tool descriptions and results are untrusted text.
 - Check the MCP TypeScript SDK's current docs before writing transport code; don't code from memory.
 - Gateway `migrations/` is read at runtime relative to `dist/`; the Dockerfile must copy it. `bootstrap` seeds woo only on first start (no users).
 - SDK 1.x facts (looked up 2026-10-15; docs are thin, source is `typescript-sdk/v1.x/src/...` on GitHub; node_modules reads are denied):
