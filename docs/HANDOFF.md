@@ -1,15 +1,14 @@
 # Handoff
-- **Done this session (phase-6 review fixes, from /phase-review phase-5):**
-  - 242ef25 fix(gateway): max 5 tool calls per LLM step (extras answered "not run: too many tool calls in one step"); deadline checked before every `callTool` incl. the post-confirm one (ends with the "stopped" reply); `LLM_BASE_URL` must be https unless `LLM_ALLOW_HTTP=true` (else log error, chat 503, gateway still starts); a new non-confirm message calls `PendingStore.clearUser`; tool list sent to the LLM capped at 64 KB (skipped names logged once), schema `title` cleaned, `examples`/`default` dropped (not when they are property names).
-  - a27dbc2 fix(dashboard): confirm card has Confirm/Decline above the args; displayed args cut at 2 KB "(truncated, N chars)".
-  - docs commit: ADR 018 updated (limits, audit scope, 4 THREAT_MODEL lines for phase 9); `.claude/rules/gateway.md` notes LLM_ALLOW_HTTP.
-  - `make lint` ok, `make test` ok, `make images && make deploy` ok. Live check: admin "list products" via `POST /api/chat` ran `woo__list_products` ok, 7 products in the reply.
-  - Review result: k8s reviewer found nothing real; security findings #1-#6 fixed or documented as above.
-- **In progress:** nothing. Ash tags phase-6 himself.
-- **Next step:** `/explain chat agent`, then `/phase 7 dod-check script` (first Phase 7 checkbox).
+- **Done this session:**
+  - 0e1e098 chore(gateway): removed the unused `no-control-regex` disable in `services/gateway/src/chat/prompt.ts` (cleanText). `make lint` and `make test` ok, so the lint run is clean.
+  - e2c627a docs(explain): `docs/explain/chat-agent.md` (flow, limits, untrusted tools, confirm/pending, history limit, chart/Secret, Chat page, logout 415, 10 questions, weak points). Line refs match the code after the lint fix.
+  - Tag `phase-6` now points at e2c627a (moved from a24c601 on Ash's say-so).
+  - Quiz on the chat agent: 3 questions sent (confirm args, injection layers, client history). Ash has not answered yet.
+- **In progress:** nothing.
+- **Next step:** `7 dod-check script`
 - **Gotchas learned:**
-  - Python heredocs with `'''` strings in Git Bash broke once; write the patch script with the Write tool and run it instead.
-  - Agent tests move time with the new `now` option on `AgentOptions`; the `budgetMs: 0` trick tests "confirm after deadline".
-  - `eslint` warns about an unused `no-control-regex` disable at `services/gateway/src/chat/prompt.ts:17` (pre-existing, harmless).
-  - Parked for phase 7: audit `args` column and `declined` rows (ADR 018).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 7), `docs/REQUIREMENTS.md`, `scripts/dod-check.sh` (if it exists), `Makefile`, `scripts/register-upstreams.sh`.
+  - `sed -n A,B file | cat -n` numbers from 1, not from A. Add A-1 before quoting a line number, or use `grep -n`.
+  - Edit a line by pattern (`sed -i '17{/pattern/d}'`), not by number alone; a wrong delete broke `prompt.ts` once (restored with `git checkout`).
+  - `make lint && make test` takes over 2 min; run it with `run_in_background` and wait for the notification.
+  - Parked for phase 7: audit `args` column and `declined` rows (ADR 018). Weak points listed in `docs/explain/chat-agent.md` section 14 (no per-user rate cap over time, no gateway egress policy, per-member tool permissions to check).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 7), `docs/REQUIREMENTS.md`, `Makefile`, `scripts/register-upstreams.sh`, `scripts/dod-check.sh` (if it exists).
