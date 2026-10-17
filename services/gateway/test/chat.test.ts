@@ -3,7 +3,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AuthUser } from "../src/api-keys.js";
 import { ChatAgent, type LlmFn } from "../src/chat/agent.js";
-import { ChatError } from "../src/chat/errors.js";
+import { ChatError, LlmError } from "../src/chat/errors.js";
 import { PendingStore } from "../src/chat/pending.js";
 import { cleanText, toLlmTools, wrapToolResult } from "../src/chat/prompt.js";
 import type { ChatMessage } from "../src/chat/types.js";
@@ -138,6 +138,14 @@ describe("ChatAgent", () => {
     expect(out.reply).toBe("hello");
     expect(out.messages).toEqual([say("hello")]);
     expect(seen[0]![0]!.role).toBe("system");
+  });
+
+  it("turns a provider 429 into a clear reply and counts the step", async () => {
+    const out = await agent(async () => {
+      throw new LlmError(429);
+    })({ user, messages: [user1] });
+    expect(out.reply).toBe("The model is rate limited, try again in a moment.");
+    expect(out.steps).toBe(1);
   });
 
   it("runs an allowlisted tool as the user, audits source=chat, wraps the result", async () => {

@@ -1,5 +1,8 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
 import type pg from "pg";
+import { ChatAgent } from "./chat/agent.js";
+import { PendingStore } from "./chat/pending.js";
+import type { LlmFn } from "./chat/types.js";
 import { Gateway, type ToolBackend } from "./gateway.js";
 import { createApiRouter } from "./api/router.js";
 import { createMcpEndpoint } from "./mcp-endpoint.js";
@@ -13,6 +16,8 @@ export interface AppOptions {
   now?: () => number;
   cookieSecure?: boolean;
   allowLoopback?: boolean; // tests only: lets /api/servers accept 127.0.0.1 upstream URLs
+  llm?: LlmFn; // unset = /api/chat answers 503
+  chatReadOnlyTools?: Set<string>; // tools chat may run without a confirm; empty = confirm everything
 }
 
 export interface App {
@@ -33,6 +38,8 @@ const jsonErrors: ErrorRequestHandler = (err: { status?: number; type?: string }
 export function createApp(options: AppOptions): App {
   const { pool, upstreams } = options;
   const gateway = new Gateway(pool, upstreams);
+  // One agent for the whole app, so the in-flight set and the pending confirms are shared by all requests.
+  const chat = options.llm ? new ChatAgent({ gateway, llm: options.llm, readOnlyTools: options.chatReadOnlyTools ?? new Set(), pending: new PendingStore() }) : null;
   const mcp = createMcpEndpoint({ pool, gateway, idleMs: options.idleMs ?? 30 * 60_000, now: options.now ?? Date.now });
   upstreams.on("toolsChanged", mcp.notifyToolsChanged);
 
@@ -46,7 +53,7 @@ export function createApp(options: AppOptions): App {
     );
   });
   app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
-  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback }));
+  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback, chat }));
   app.use(jsonErrors);
 
   return { express: app, gateway, sessionCount: mcp.sessionCount, sweep: mcp.sweep, closeSessions: mcp.closeAll };

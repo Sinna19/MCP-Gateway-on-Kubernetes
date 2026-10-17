@@ -1,3 +1,4 @@
+import { LlmError } from "./errors.js";
 import type { ChatMessage, LlmFn, ToolCall } from "./types.js";
 
 export interface LlmConfig {
@@ -18,7 +19,7 @@ export function createLlm({ baseUrl, model, apiKey }: LlmConfig): LlmFn {
       redirect: "error",
       signal,
     });
-    if (!res.ok) throw new Error(`llm responded ${res.status}`);
+    if (!res.ok) throw new LlmError(res.status);
     const data = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: unknown } }[] };
     const message = data.choices?.[0]?.message;
     if (!message) throw new Error("llm response had no message");

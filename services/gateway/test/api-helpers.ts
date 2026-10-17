@@ -36,7 +36,7 @@ export interface TestServer {
   stop: () => Promise<void>;
 }
 
-export async function startServer(pool: pg.Pool, upstreams: AppOptions["upstreams"] = emptyUpstreams(), extra: Pick<AppOptions, "allowLoopback"> = {}): Promise<TestServer> {
+export async function startServer(pool: pg.Pool, upstreams: AppOptions["upstreams"] = emptyUpstreams(), extra: Pick<AppOptions, "allowLoopback" | "llm" | "chatReadOnlyTools"> = {}): Promise<TestServer> {
   const app = createApp({ pool, upstreams, credentialsKey: CREDENTIALS_KEY, ...extra });
   const http = await new Promise<Server>((resolve) => {
     const s = app.express.listen(0, "127.0.0.1", () => resolve(s));

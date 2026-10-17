@@ -1,7 +1,7 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthUser } from "../api-keys.js";
 import type { CallSource } from "../gateway.js";
-import { ChatError } from "./errors.js";
+import { ChatError, LlmError } from "./errors.js";
 import type { PendingStore } from "./pending.js";
 import { SYSTEM_PROMPT, cleanText, resultText, toLlmTools, wrapToolResult } from "./prompt.js";
 import type { ChatMessage, LlmFn, ToolCall } from "./types.js";
@@ -45,6 +45,7 @@ export interface ChatResult {
   reply: string;
   messages: ChatMessage[]; // this turn's new messages, for the client to append; empty while a confirm is pending
   toolCalls: ToolCallView[]; // calls made during this request
+  steps: number; // LLM calls made during this request (for the one log line)
   pendingToolCall?: { id: string; tool: string; args: Record<string, unknown> };
 }
 
@@ -103,6 +104,7 @@ export class ChatAgent {
     const toolCalls: ToolCallView[] = [];
     let convo: ChatMessage[];
     let turnStart: number;
+    let steps = 0;
 
     if (confirm) {
       // Resume exactly what the server proposed; the messages and args the client sent are ignored.
@@ -122,7 +124,7 @@ export class ChatAgent {
 
     const finish = (reply: string, addMessage: boolean): ChatResult => {
       if (addMessage) convo.push({ role: "assistant", content: reply });
-      return { reply, messages: convo.slice(turnStart), toolCalls };
+      return { reply, messages: convo.slice(turnStart), toolCalls, steps };
     };
 
     for (let step = 0; step < this.maxSteps; step++) {
@@ -132,11 +134,14 @@ export class ChatAgent {
       const signal = AbortSignal.any([AbortSignal.timeout(this.llmTimeoutMs), AbortSignal.timeout(left)]);
 
       let assistant: ChatMessage;
+      steps++;
       try {
         assistant = await this.options.llm([{ role: "system", content: SYSTEM_PROMPT }, ...convo], toLlmTools(tools), signal);
       } catch (err) {
         console.error("chat: llm call failed:", err instanceof Error ? err.message : err);
-        return finish(signal.aborted ? "The model took too long to answer." : "The model call failed.", true);
+        if (signal.aborted) return finish("The model took too long to answer.", true);
+        if (err instanceof LlmError && err.status === 429) return finish("The model is rate limited, try again in a moment.", true);
+        return finish("The model call failed.", true);
       }
       convo.push(assistant);
       const calls = assistant.tool_calls ?? [];
@@ -161,7 +166,7 @@ export class ChatAgent {
       if (pendingCall) {
         const { call, args } = pendingCall;
         const id = this.options.pending.add({ userId: user.id, tool: call.function.name, args, toolCallId: call.id, messages: convo, turnStart });
-        return { reply: "", messages: [], toolCalls, pendingToolCall: { id, tool: call.function.name, args } };
+        return { reply: "", messages: [], toolCalls, steps, pendingToolCall: { id, tool: call.function.name, args } };
       }
     }
     return finish(`I stopped after ${this.maxSteps} steps without a final answer.`, true);

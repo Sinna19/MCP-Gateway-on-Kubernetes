@@ -22,6 +22,21 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ DATABASE_URL: "postgres://secret" })).toThrow(/CREDENTIALS_KEY.*ADMIN_EMAIL/);
     expect(() => loadConfig({ DATABASE_URL: "postgres://secret" })).not.toThrow(/secret/);
   });
+  it("leaves llm unset unless base url, model and key are all non-empty", () => {
+    const full = { LLM_BASE_URL: "http://llm/v1", LLM_MODEL: "m", LLM_API_KEY: "k" };
+    expect(loadConfig(valid).llm).toBeUndefined();
+    expect(loadConfig({ ...valid, ...full }).llm).toEqual({ baseUrl: "http://llm/v1", model: "m", apiKey: "k" });
+    // the chart renders LLM_BASE_URL="" by default: empty means unset
+    expect(loadConfig({ ...valid, ...full, LLM_BASE_URL: "" }).llm).toBeUndefined();
+    expect(loadConfig({ ...valid, ...full, LLM_MODEL: "" }).llm).toBeUndefined();
+    expect(loadConfig({ ...valid, ...full, LLM_API_KEY: "" }).llm).toBeUndefined();
+  });
+  it("parses CHAT_READ_ONLY_TOOLS: trims entries and drops empty ones", () => {
+    expect(loadConfig(valid).chatReadOnlyTools.size).toBe(0);
+    expect(loadConfig({ ...valid, CHAT_READ_ONLY_TOOLS: "" }).chatReadOnlyTools.size).toBe(0);
+    const tools = loadConfig({ ...valid, CHAT_READ_ONLY_TOOLS: " woo__list_orders , ,fx__list_rates,, " }).chatReadOnlyTools;
+    expect([...tools]).toEqual(["woo__list_orders", "fx__list_rates"]);
+  });
   it("rejects a credentials key that is not 32 bytes", () => {
     expect(() => loadConfig({ ...valid, CREDENTIALS_KEY: Buffer.from("short").toString("base64") })).toThrow("CREDENTIALS_KEY must be 32 bytes");
   });
