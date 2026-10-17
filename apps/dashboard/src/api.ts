@@ -13,11 +13,14 @@ export function setOnUnauthorized(fn: () => void): void {
 }
 
 export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  const method = opts.method ?? "GET";
+  // The gateway answers 415 to any POST/PATCH/PUT that isn't JSON (its CSRF defence), so writes always send a body.
+  const body = opts.body === undefined && ["POST", "PATCH", "PUT"].includes(method) ? {} : opts.body;
   const res = await fetch(`/api${path}`, {
-    method: opts.method ?? "GET",
+    method,
     credentials: "same-origin",
-    headers: opts.body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
   // A proxy error page (Traefik 502/504) is HTML, not JSON. Treat it as "no body" so the status still decides what happens.

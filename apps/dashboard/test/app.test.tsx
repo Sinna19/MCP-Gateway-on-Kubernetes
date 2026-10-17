@@ -115,6 +115,19 @@ describe("api()", () => {
     expect(inits[0]?.body).toBe('{"name":"laptop"}');
     await waitFor(() => expect(inits[0]?.credentials).toBe("same-origin"));
   });
+
+  it("sends an empty JSON body on a write with no body, like logout", async () => {
+    const { inits } = stubApi(() => ({ status: 204 }));
+    await api("/auth/logout", { method: "POST" });
+    expect(new Headers(inits[0]?.headers).get("Content-Type")).toBe("application/json");
+    expect(inits[0]?.body).toBe("{}");
+  });
+
+  it("sends no body on GET or DELETE", async () => {
+    const { inits } = stubApi(() => ({ status: 204 }));
+    await api("/keys/1", { method: "DELETE" });
+    expect(inits[0]?.body).toBeUndefined();
+  });
 });
 
 describe("api() on non-JSON bodies", () => {
