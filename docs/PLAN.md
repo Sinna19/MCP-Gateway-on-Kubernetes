@@ -67,10 +67,12 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - **Accept:** a member cannot reach admin pages or admin API routes (API test, not just UI); credentials never appear in browser network tab.
 
 ## Phase 6: Chat agent
-- [ ] Backend endpoint `/api/chat`: LLM call with tools from the user's view of the gateway, loop until no tool calls (max N steps), each call through the same `callTool(user, name, args)` used by `/mcp`, audit `source=chat`
-- [ ] UI shows each tool call (name, args, result summary)
-- [ ] Treat tool descriptions and results as untrusted text in the system prompt
-- [ ] Cap the length of upstream tool descriptions before they go into the LLM prompt
+- [ ] (6a done: agent core in `services/gateway/src/chat/`, ADR 017/018; 6b: route + chart + Secret) Backend endpoint `/api/chat`: LLM call with tools from the user's view of the gateway, loop until no tool calls (max N steps), each call through the same `callTool(user, name, args)` used by `/mcp`, audit `source=chat`
+- [ ] (6c) UI shows each tool call (name, args, result summary), plain text only
+- [x] (6a) Treat tool descriptions and results as untrusted text in the system prompt
+- [x] (6a) Cap the length of upstream tool descriptions (and nested schema descriptions) before they go into the LLM prompt
+- [x] (6a) Confirm step for write tools: gateway-side read-only allowlist, server-stored pending call (UI card in 6c)
+- [x] (6a) Max 8 steps, 20 s per LLM call, 55 s per request, one in-flight request per user
 - **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
 
 ## Phase 7: DoD run + hardening
