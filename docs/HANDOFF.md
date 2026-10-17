@@ -1,17 +1,19 @@
 # Handoff
-- **Done this session (phase 5 review fixes):**
-  - 8c99219 `fix(dashboard)`: `api()` tolerates non-JSON bodies (HTML 502 readable, HTML 401 still re-logins); logout keeps the session on network/5xx and shows "Logout failed, try again", 401 counts as logged out; `encodeURIComponent` on slug/id; Login redirect keeps `search`; `/healthz` gets security headers; added Permissions-Policy and COOP. Tests added in `apps/dashboard/test/app.test.tsx`.
-  - Same commit: ADR 014 (invite token in URL path, known limitation), ADR 016 (shared `gateway-tls` secret: cert-manager annotations on both Ingresses or neither).
-  - Verified: `make lint`, `make test` green; `make images && make deploy` ok; header curls on `/`, `/servers`, `/healthz`, `/assets/nope.js` (404) all show CSP, COOP, Permissions-Policy, XFO, nosniff, no-referrer.
-  - Skipped on purpose: credential form clears the secret on PATCH failure (safe direction).
-- **In progress:** nothing.
-- **Next step:** `/phase 6 chat agent` (PLAN.md Phase 6). Ash tags phase-5 first.
-- **THREAT_MODEL.md lines (phase 9):**
-  - Invite token is in the URL path, so it reaches access logs and browser history; mitigated by single-use, expiry and no-referrer (ADR 014).
-  - Base images in all Dockerfiles are pinned by tag, not digest; pin digests in phase 7 if time allows, otherwise record as a limitation.
-- **Phase 7 item (record only):** a revoked key's `/mcp` session and SSE stream live until the 30-min idle timeout (ADR 014).
+- **Done this session (phase 6 plan + 6a):**
+  - Phase 6 planned and approved (plan: `~/.claude/plans/pasted-content-id-9b71-phase-6-buzzing-bengio.md`). Split: 6a agent core, 6b `/api/chat` + chart + Secret, 6c chat page, 6d Accept + `/phase-review phase-6`.
+  - cbfb8a3 `feat(gateway)`: `services/gateway/src/chat/{agent,pending,prompt,llm,types,errors}.ts`, `test/chat.test.ts` (19 tests), ADR 017 (agent, limits, timeouts) and ADR 018 (untrusted tool text, confirm flow, THREAT_MODEL lines), PLAN.md ticked for the 6a items.
+  - Verified: `make lint` ok, `make test` ok.
+- **In progress:** nothing. `/api/chat` itself is not wired yet (the PLAN.md checkbox for it stays open until 6b).
+- **Next step:** `/phase 6 6b api chat route and chart`
+- **Decided by Ash:** OpenAI-compatible fetch, key in Secret `llm-api` (optional, 503 "chat not configured" if missing), client sends history (last 20), no SSE, two-step confirm with server-stored pending call.
+- **For 6b:**
+  - Route returns `ChatError.status` + message. `ChatAgent` is built once in `createApp`, so the in-flight set and `PendingStore` are shared.
+  - Needs `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `CHAT_READ_ONLY_TOOLS` in `src/config.ts`. Read-only list: `woo__list_products`, `woo__list_orders`, `woo__get_order`, `fx__convert_currency`, `fx__list_rates`, `notes__list_notes`, `notes__list_products`.
+  - Body: `strictObject`, 64 KB cap (413), roles user/assistant/tool only; confirm body is `{messages, confirm:{id, approve}}`.
+  - Re-check the Traefik response timeout with a real slow turn (ADR 017 says it is unverified).
+  - `llm.ts` has no unit test yet; 6b can test it against a local http server.
 - **Gotchas learned:**
-  - Dashboard image tag comes from the committed tree of `apps/dashboard`: commit before `make deploy`.
-  - nginx `add_header` is not inherited into a location that sets its own; headers live in `security-headers.conf`, included in every location.
-  - Git Bash mangles `/tmp` in `docker run`: prefix `MSYS_NO_PATHCONV=1`.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `.claude/rules/gateway.md`, `services/gateway/src` (callTool path).
+  - Audit `user_id` comes back from `pg` as a string: compare with `String(user.id)` in tests.
+  - A long bash heredoc with a quoted `'EOF'` failed to parse in the Bash tool here; use the Write tool for big files.
+  - `AbortSignal.any` is used for the LLM budget (needs Node 20.3+; check the gateway Dockerfile base image in 6b).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `docs/decisions/017-chat-agent.md`, `services/gateway/src/chat/agent.ts`, `src/app.ts`, `src/api/router.ts`, `src/config.ts`, `charts/gateway/` templates + values, `scripts/secrets.sh`.
