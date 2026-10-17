@@ -73,7 +73,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [x] (6a) Cap the length of upstream tool descriptions (and nested schema descriptions) before they go into the LLM prompt
 - [x] (6a) Confirm step for write tools: gateway-side read-only allowlist, server-stored pending call (UI card in 6c)
 - [x] (6a) Max 8 steps, 20 s per LLM call, 55 s per request, one in-flight request per user
-- **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
+- [x] (6d, 2026-10-17, two members, plus injection and disabled-server checks) **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
 
 ## Phase 7: DoD run + hardening
 - [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled.

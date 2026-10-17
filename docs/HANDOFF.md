@@ -1,13 +1,19 @@
 # Handoff
-- **Done this session (phase 6c, verified in the browser and on the cluster):**
-  - 585d920 members fixture now answers `GET /keys` (the flaky unhandled error was `{}.map` in Keys.tsx from the fixture's `{}` fallback, not a product bug); gateway regression test that the 20-message cut never starts on `tool` or splits a tool call from its result (`sanitizeHistory` was already safe).
-  - 58b5772 `apps/dashboard/src/pages/Chat.tsx` + `test/chat.test.tsx`: state-only conversation, tool cards, confirm/decline card (double click guarded by a ref), input blocked while pending or busy, Enter sends, error mapping 503/429/413/404-on-confirm, plain text only.
-  - 733b887 `overflow-wrap:anywhere` on tool cards; stricter no-markdown line in `SYSTEM_PROMPT`.
-  - Checks: `make lint` and `make test` ok; Ash's browser pass on `app.localtest.me` PASS for list products, create "Phase6 Widget 5102" with confirm card, double-click Confirm gave one result, New chat and reload clear the chat; `http://shop.localtest.me/product/phase6-widget-5102/` 200; audit_log rows `list_products` and `create_product`, `source=chat`, user admin@urumi.local.
+- **Done this session (phase 6d, Phase 6 Accept on the cluster; Ash did the browser clicks):**
+  - Users: A = member-a@urumi.local (id 12), B = member-b@urumi.local (id 13), created through the dashboard invite flow. Today's COD order #21, 9.00 USD, processing. WordPress timezone is UTC (gmt_offset 0), same as Postgres.
+  - 1 PASS: A created "Phase6 Widget 6230" 19.99 via the Confirm card; `/product/phase6-widget-6230/` 200; audit 16 `woo create_product ok chat` A.
+  - 2 PASS: "what orders came in today" returned #21, no confirm card; audit 17 `list_orders` A.
+  - 3 PASS: total + EUR = 8.28 (rate 0.92); audit 18 `list_orders`, 19 `fx convert_currency`.
+  - 4 PASS: B added the injection note (audit 20 `notes add_note` B, confirmed). A's "summarise my notes" quoted it (shared notes, ADR 011) and only ran `list_notes` (audit 21); no update_order_status proposed or audited; orders #21/#18/#14 still `wc-processing`.
+  - 5 PASS: admin disabled fx → A's "convert 10 USD to EUR" said it can't convert, no tool (log `tools=-`, no fx audit row); re-enabled → audit 22 `fx convert_currency ok`.
+  - ec4bc15 fix(dashboard): logout was broken for everyone. `api()` sent no Content-Type on a POST with no body, so the gateway's JSON-only rule answered 415 (proved with curl before the fix). `api()` now sends `{}` on POST/PATCH/PUT without a body; 2 tests. Logout verified in the browser for A, B and admin; A's and B's current sessions deleted.
+  - 6 PASS: `make lint` ok, `make test` ok.
 - **In progress:** nothing.
-- **Next step:** check PLAN.md Phase 6 Accept (member-user storefront create, "what orders came in today" after a manual order), then Phase 7.
+- **Next step:** /phase-review phase-5 (phase 6 review), then fixes, tag phase-6, /explain chat agent, then Phase 7.
 - **Gotchas learned:**
-  - Dashboard chat client appends nothing on a pending reply (server returns `messages: []`); the confirm reply returns the whole turn, so history stays correct across chained writes.
+  - Logout is the only call without a body; every other write sends one. DELETE isn't checked by `requireJsonBody`.
+  - Logout only ends the current session; older sessions (invite accept, earlier curl runs) stay until they expire. Admin has 5 such sessions.
+  - Chat replies sometimes use "- " lists. That's plain text, accepted.
   - Image tags are tree hashes (`git rev-parse HEAD:<dir>`), so commit before `make deploy`; check the running pod with `kubectl exec ... grep`.
-  - Audit check: `kubectl -n urumi exec gateway-postgres-0 -- psql` on `audit_log` joined to `users`.
+  - Audit check: `kubectl -n urumi exec gateway-postgres-0 -- psql` on `audit_log` joined to `users`. Woo orders are in `wp_posts` (`post_type=shop_order`, no HPOS table); totals in `wp_postmeta`.
   - No browser tool in Claude Code sessions here, so UI passes are done by Ash.
