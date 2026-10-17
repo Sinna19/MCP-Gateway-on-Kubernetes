@@ -68,7 +68,7 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 
 ## Phase 6: Chat agent
 - [x] (6a agent core in `services/gateway/src/chat/`, ADR 017/018; 6b route + chart + Secret, verified on the cluster) Backend endpoint `/api/chat`: LLM call with tools from the user's view of the gateway, loop until no tool calls (max N steps), each call through the same `callTool(user, name, args)` used by `/mcp`, audit `source=chat`
-- [ ] (6c) UI shows each tool call (name, args, result summary), plain text only
+- [x] (6c) UI shows each tool call (name, args, result summary), plain text only
 - [x] (6a) Treat tool descriptions and results as untrusted text in the system prompt
 - [x] (6a) Cap the length of upstream tool descriptions (and nested schema descriptions) before they go into the LLM prompt
 - [x] (6a) Confirm step for write tools: gateway-side read-only allowlist, server-stored pending call (UI card in 6c)

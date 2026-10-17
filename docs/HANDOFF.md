@@ -1,16 +1,13 @@
 # Handoff
-- **Done this session (phase 6b, all verified on the cluster):**
-  - 25a866d `feat(gateway)`: `POST /api/chat` (`src/api/chat.ts`), `llm` + `chatReadOnlyTools` in config/app/index, `LlmError`, provider 429 reply, `steps` in the log line; tests `llm.test.ts`, `api-chat.test.ts`, config cases (241 gateway tests).
-  - dabe092 `feat(charts)`: gateway `llm.*` and `chat.readOnlyTools` values, env incl. optional Secret `llm-api` (key `api-key`), Groq `openai/gpt-oss-120b` in `values-local.yaml`.
-  - 215ce44 ADR 017: measured a 55 s turn through Traefik, 200 uncut. 44a78cc `secrets.sh` llm-api step fixed (`--from-literal`). 57a90f3 prompt fix. 502b7fd PLAN ticked.
-  - Checks: no Secret gives 503; read question gives reply + toolCalls; write gives `pendingToolCall`, approve created "Phase6 Widget 4821" (live at `shop.localtest.me/product/phase6-widget-4821/`), audit `source=chat` under admin; replay gives 404.
+- **Done this session (phase 6c, verified in the browser and on the cluster):**
+  - 585d920 members fixture now answers `GET /keys` (the flaky unhandled error was `{}.map` in Keys.tsx from the fixture's `{}` fallback, not a product bug); gateway regression test that the 20-message cut never starts on `tool` or splits a tool call from its result (`sanitizeHistory` was already safe).
+  - 58b5772 `apps/dashboard/src/pages/Chat.tsx` + `test/chat.test.tsx`: state-only conversation, tool cards, confirm/decline card (double click guarded by a ref), input blocked while pending or busy, Enter sends, error mapping 503/429/413/404-on-confirm, plain text only.
+  - 733b887 `overflow-wrap:anywhere` on tool cards; stricter no-markdown line in `SYSTEM_PROMPT`.
+  - Checks: `make lint` and `make test` ok; Ash's browser pass on `app.localtest.me` PASS for list products, create "Phase6 Widget 5102" with confirm card, double-click Confirm gave one result, New chat and reload clear the chat; `http://shop.localtest.me/product/phase6-widget-5102/` 200; audit_log rows `list_products` and `create_product`, `source=chat`, user admin@urumi.local.
 - **In progress:** nothing.
-- **Next step:** `/phase 6 6c chat page` (UI shows each tool call: name, args, result summary, plain text; confirm card for `pendingToolCall`; client keeps history and appends `messages`).
-- **Key commands for Ash (llm-api already exists):** set/replace: `read -rs LLM_API_KEY; export LLM_API_KEY; scripts/secrets.sh | grep llm; unset LLM_API_KEY; kubectl -n urumi rollout restart deploy/gateway`. Wrong key typed: `kubectl -n urumi delete secret llm-api`, repeat, `unset LLM_API_KEY`.
-- **Gotchas learned (durable ones are in the rules files):**
-  - gpt-oss asked for confirmation in prose until the prompt said the system holds writes (rules/gateway.md).
-  - Windows kubectl cannot read `/dev/stdin` (rules/kubernetes.md).
-  - Dashboard vitest sometimes prints 1 unhandled error from `test/members.test.tsx` (React render, `keys.map`); 63 tests still pass. Not investigated; look at it in 6c or phase 7.
-  - `kubectl set env` drifts from the chart; I reset it to the chart values after the stub test.
-  - Response JSON: `pendingToolCall.id` is a uuid; `reply` is "" while pending and `messages` is empty.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `docs/decisions/017-chat-agent.md`, `018-*.md`, `services/gateway/src/api/chat.ts` (request/response shape), `.claude/rules/dashboard.md` if present, and `apps/dashboard/src` (router, api client, one existing page and its test as pattern).
+- **Next step:** check PLAN.md Phase 6 Accept (member-user storefront create, "what orders came in today" after a manual order), then Phase 7.
+- **Gotchas learned:**
+  - Dashboard chat client appends nothing on a pending reply (server returns `messages: []`); the confirm reply returns the whole turn, so history stays correct across chained writes.
+  - Image tags are tree hashes (`git rev-parse HEAD:<dir>`), so commit before `make deploy`; check the running pod with `kubectl exec ... grep`.
+  - Audit check: `kubectl -n urumi exec gateway-postgres-0 -- psql` on `audit_log` joined to `users`.
+  - No browser tool in Claude Code sessions here, so UI passes are done by Ash.
