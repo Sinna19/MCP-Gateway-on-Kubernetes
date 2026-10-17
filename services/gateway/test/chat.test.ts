@@ -252,6 +252,32 @@ describe("ChatAgent", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("history: the 20-message cut never starts on a tool message or splits a tool call from its result", async () => {
+    // Turns of [user, assistant+call, tool, assistant]: depending on the extra leading messages the cut lands on every kind.
+    const turn = (i: number): ChatMessage[] => [
+      { role: "user", content: `q${i}` },
+      assistantCalls(toolCall(`c${i}`, "woo__list_products", {})),
+      { role: "tool", tool_call_id: `c${i}`, content: "r" },
+      say(`a${i}`),
+    ];
+    for (let extra = 0; extra < 4; extra++) {
+      seen.length = 0;
+      const history: ChatMessage[] = [
+        ...Array.from({ length: extra }, (_, i) => ({ role: "user", content: `lead${i}` }) as ChatMessage),
+        ...[0, 1, 2, 3, 4, 5].flatMap(turn),
+        user1,
+      ];
+      await agent(scripted(say("a")))({ user, messages: history });
+      const sent = seen[0]!.slice(1); // drop the system prompt
+      expect(sent[0]!.role).toBe("user");
+      sent.forEach((m, i) => {
+        if (m.role !== "tool") return;
+        const before = sent[i - 1];
+        expect(before?.tool_calls?.some((c) => c.id === m.tool_call_id)).toBe(true);
+      });
+    }
+  });
+
   it("a second concurrent turn for the same user is busy", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));

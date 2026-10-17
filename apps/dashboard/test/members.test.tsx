@@ -22,6 +22,8 @@ function gateway(write: (path: string, init: RequestInit) => Reply = () => ({ st
     if (method === "GET" && path === "/members") return { status: 200, body: [me, bob] };
     if (method === "GET" && path === "/invites") return { status: 200, body: [pending] };
     if (method === "GET" && path === "/keys?all=true") return { status: 200, body: [bobKey, bobOldKey] };
+    // A member redirected to My Keys calls this one. Without it the {} fallback hit keys.map.
+    if (method === "GET" && path === "/keys") return { status: 200, body: [] };
     return write(path, init);
   };
 }
