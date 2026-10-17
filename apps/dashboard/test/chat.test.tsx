@@ -96,6 +96,29 @@ describe("chat page", () => {
     expect(screen.getByLabelText("Message")).toBeEnabled();
   });
 
+  it("the confirm card puts Confirm above the args and cuts long args at 2 KB", async () => {
+    const big = { name: "Widget", note: "x".repeat(5000) };
+    stubApi(gateway(() => ({ status: 200, body: { ...pendingTurn, pendingToolCall: { ...pendingTurn.pendingToolCall, args: big } } })));
+    await openChat();
+    await ask("create a product");
+    const confirm = await screen.findByRole("button", { name: "Confirm" });
+    const card = screen.getByTestId("pending-card");
+    const pre = card.querySelector("pre")!;
+    const full = JSON.stringify(big, null, 2);
+    expect(confirm.compareDocumentPosition(pre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pre.textContent!.startsWith(full.slice(0, 2048))).toBe(true);
+    expect(pre.textContent).toContain(`(truncated, ${full.length} chars)`);
+    expect(pre.textContent!.length).toBeLessThan(2048 + 60);
+  });
+
+  it("short args are shown whole, without a truncation note", async () => {
+    stubApi(gateway(() => ({ status: 200, body: pendingTurn })));
+    await openChat();
+    await ask("create a product");
+    await screen.findByRole("button", { name: "Confirm" });
+    expect(screen.getByTestId("pending-card").querySelector("pre")!.textContent).toBe(JSON.stringify(pendingTurn.pendingToolCall.args, null, 2));
+  });
+
   it("Decline sends approve:false", async () => {
     const { calls, inits } = stubApi(
       gateway((body) =>

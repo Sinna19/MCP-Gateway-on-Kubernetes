@@ -41,8 +41,14 @@ function errorText(err: unknown, confirming: boolean): string {
   return err.message;
 }
 
+const MAX_ARGS_CHARS = 2048;
+
+// Only the display is cut; the server runs the full stored args when you confirm.
 function ArgsBlock({ args }: { args: Record<string, unknown> }) {
-  return <pre>{JSON.stringify(args, null, 2)}</pre>;
+  const full = JSON.stringify(args, null, 2);
+  const shown = full.length > MAX_ARGS_CHARS ? `${full.slice(0, MAX_ARGS_CHARS)}
+(truncated, ${full.length} chars)` : full;
+  return <pre>{shown}</pre>;
 }
 
 export function Chat() {
@@ -132,13 +138,13 @@ export function Chat() {
           <div className="chat-card chat-pending" data-testid="pending-card">
             <p>Waiting for your OK to run:</p>
             <strong>{pending.tool}</strong>
-            <ArgsBlock args={pending.args} />
             <button onClick={() => answer(true)} disabled={busy}>
               Confirm
             </button>{" "}
             <button onClick={() => answer(false)} disabled={busy}>
               Decline
             </button>
+            <ArgsBlock args={pending.args} />
           </div>
         )}
         {busy && <p role="status">Thinking…</p>}
