@@ -1,19 +1,16 @@
 # Handoff
-- **Done this session (phase 6 plan + 6a):**
-  - Phase 6 planned and approved (plan: `~/.claude/plans/pasted-content-id-9b71-phase-6-buzzing-bengio.md`). Split: 6a agent core, 6b `/api/chat` + chart + Secret, 6c chat page, 6d Accept + `/phase-review phase-6`.
-  - cbfb8a3 `feat(gateway)`: `services/gateway/src/chat/{agent,pending,prompt,llm,types,errors}.ts`, `test/chat.test.ts` (19 tests), ADR 017 (agent, limits, timeouts) and ADR 018 (untrusted tool text, confirm flow, THREAT_MODEL lines), PLAN.md ticked for the 6a items.
-  - Verified: `make lint` ok, `make test` ok.
-- **In progress:** nothing. `/api/chat` itself is not wired yet (the PLAN.md checkbox for it stays open until 6b).
-- **Next step:** `/phase 6 6b api chat route and chart`
-- **Decided by Ash:** OpenAI-compatible fetch, key in Secret `llm-api` (optional, 503 "chat not configured" if missing), client sends history (last 20), no SSE, two-step confirm with server-stored pending call.
-- **For 6b:**
-  - Route returns `ChatError.status` + message. `ChatAgent` is built once in `createApp`, so the in-flight set and `PendingStore` are shared.
-  - Needs `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `CHAT_READ_ONLY_TOOLS` in `src/config.ts`. Read-only list: `woo__list_products`, `woo__list_orders`, `woo__get_order`, `fx__convert_currency`, `fx__list_rates`, `notes__list_notes`, `notes__list_products`.
-  - Body: `strictObject`, 64 KB cap (413), roles user/assistant/tool only; confirm body is `{messages, confirm:{id, approve}}`.
-  - Re-check the Traefik response timeout with a real slow turn (ADR 017 says it is unverified).
-  - `llm.ts` has no unit test yet; 6b can test it against a local http server.
-- **Gotchas learned:**
-  - Audit `user_id` comes back from `pg` as a string: compare with `String(user.id)` in tests.
-  - A long bash heredoc with a quoted `'EOF'` failed to parse in the Bash tool here; use the Write tool for big files.
-  - `AbortSignal.any` is used for the LLM budget (needs Node 20.3+; check the gateway Dockerfile base image in 6b).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `docs/decisions/017-chat-agent.md`, `services/gateway/src/chat/agent.ts`, `src/app.ts`, `src/api/router.ts`, `src/config.ts`, `charts/gateway/` templates + values, `scripts/secrets.sh`.
+- **Done this session (phase 6b, all verified on the cluster):**
+  - 25a866d `feat(gateway)`: `POST /api/chat` (`src/api/chat.ts`), `llm` + `chatReadOnlyTools` in config/app/index, `LlmError`, provider 429 reply, `steps` in the log line; tests `llm.test.ts`, `api-chat.test.ts`, config cases (241 gateway tests).
+  - dabe092 `feat(charts)`: gateway `llm.*` and `chat.readOnlyTools` values, env incl. optional Secret `llm-api` (key `api-key`), Groq `openai/gpt-oss-120b` in `values-local.yaml`.
+  - 215ce44 ADR 017: measured a 55 s turn through Traefik, 200 uncut. 44a78cc `secrets.sh` llm-api step fixed (`--from-literal`). 57a90f3 prompt fix. 502b7fd PLAN ticked.
+  - Checks: no Secret gives 503; read question gives reply + toolCalls; write gives `pendingToolCall`, approve created "Phase6 Widget 4821" (live at `shop.localtest.me/product/phase6-widget-4821/`), audit `source=chat` under admin; replay gives 404.
+- **In progress:** nothing.
+- **Next step:** `/phase 6 6c chat page` (UI shows each tool call: name, args, result summary, plain text; confirm card for `pendingToolCall`; client keeps history and appends `messages`).
+- **Key commands for Ash (llm-api already exists):** set/replace: `read -rs LLM_API_KEY; export LLM_API_KEY; scripts/secrets.sh | grep llm; unset LLM_API_KEY; kubectl -n urumi rollout restart deploy/gateway`. Wrong key typed: `kubectl -n urumi delete secret llm-api`, repeat, `unset LLM_API_KEY`.
+- **Gotchas learned (durable ones are in the rules files):**
+  - gpt-oss asked for confirmation in prose until the prompt said the system holds writes (rules/gateway.md).
+  - Windows kubectl cannot read `/dev/stdin` (rules/kubernetes.md).
+  - Dashboard vitest sometimes prints 1 unhandled error from `test/members.test.tsx` (React render, `keys.map`); 63 tests still pass. Not investigated; look at it in 6c or phase 7.
+  - `kubectl set env` drifts from the chart; I reset it to the chart values after the stub test.
+  - Response JSON: `pendingToolCall.id` is a uuid; `reply` is "" while pending and `messages` is empty.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 6), `docs/decisions/017-chat-agent.md`, `018-*.md`, `services/gateway/src/api/chat.ts` (request/response shape), `.claude/rules/dashboard.md` if present, and `apps/dashboard/src` (router, api client, one existing page and its test as pattern).
