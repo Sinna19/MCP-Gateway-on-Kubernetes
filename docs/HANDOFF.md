@@ -1,18 +1,17 @@
 # Handoff
-- **Done this session (phase 5, nginx + ingress):**
-  - 16c8cc4 `feat(dashboard)`: Members "1 key"/"N keys" and "blocked" for disabled members (test first).
-  - 62893df `feat(dashboard)`: `apps/dashboard/Dockerfile` (node build, nginx-unprivileged 1.31.7-alpine), `nginx.conf` + `security-headers.conf` (SPA fallback, `/assets/` `=404`, gzip, CSP, XFO, nosniff, no-referrer), `data:,` favicon.
-  - Chart commit `feat(charts)`: `charts/dashboard` (Deployment, Service, Ingress `/`), gateway Ingress host/paths from `ingress.*` values, umbrella dependency, Makefile `DASHBOARD_TAG` build/import/deploy/lint.
-  - 91bc48a ADR 016, PLAN lines 65-66 ticked.
-  - Accept (scratchpad `accept-nginx.sh`): 13/14 PASS; the 14th was a regex false positive (`hasCredential` is a boolean, no secret in `/api/servers`). Covers deep links, headers, gzip, asset 404, `/api/me` 401, `/mcp` with member key (10 tools), member 403s, pod uid 101 + read-only fs.
-  - Ash's browser pass at app.localtest.me: all 5 steps PASS, no CSP errors. Phase 5 is complete; Ash tags after the review.
+- **Done this session (phase 5 review fixes):**
+  - 8c99219 `fix(dashboard)`: `api()` tolerates non-JSON bodies (HTML 502 readable, HTML 401 still re-logins); logout keeps the session on network/5xx and shows "Logout failed, try again", 401 counts as logged out; `encodeURIComponent` on slug/id; Login redirect keeps `search`; `/healthz` gets security headers; added Permissions-Policy and COOP. Tests added in `apps/dashboard/test/app.test.tsx`.
+  - Same commit: ADR 014 (invite token in URL path, known limitation), ADR 016 (shared `gateway-tls` secret: cert-manager annotations on both Ingresses or neither).
+  - Verified: `make lint`, `make test` green; `make images && make deploy` ok; header curls on `/`, `/servers`, `/healthz`, `/assets/nope.js` (404) all show CSP, COOP, Permissions-Policy, XFO, nosniff, no-referrer.
+  - Skipped on purpose: credential form clears the secret on PATCH failure (safe direction).
 - **In progress:** nothing.
-- **Next step:** `/phase-review` of phase 5, then Phase 6 (chat agent), PLAN line 69+.
-- **Gotchas learned:**
-  - Git Bash mangles `/tmp` in `docker run --tmpfs /tmp`: prefix `MSYS_NO_PATHCONV=1`.
-  - nginx `add_header` is not inherited into a location that sets its own; headers live in one included file. A cache header without `always` skips 404s.
-  - sed again put a literal `\n` in a Makefile recipe; fix with the Edit tool and check `cat -A`.
-  - Dashboard image tag comes from the committed tree of `apps/dashboard`: commit before `make deploy`.
-  - Each accept run leaves a disabled `nginx-accept-*` member (ids 9, 10 so far).
+- **Next step:** `/phase 6 chat agent` (PLAN.md Phase 6). Ash tags phase-5 first.
+- **THREAT_MODEL.md lines (phase 9):**
+  - Invite token is in the URL path, so it reaches access logs and browser history; mitigated by single-use, expiry and no-referrer (ADR 014).
+  - Base images in all Dockerfiles are pinned by tag, not digest; pin digests in phase 7 if time allows, otherwise record as a limitation.
 - **Phase 7 item (record only):** a revoked key's `/mcp` session and SSE stream live until the 30-min idle timeout (ADR 014).
+- **Gotchas learned:**
+  - Dashboard image tag comes from the committed tree of `apps/dashboard`: commit before `make deploy`.
+  - nginx `add_header` is not inherited into a location that sets its own; headers live in `security-headers.conf`, included in every location.
+  - Git Bash mangles `/tmp` in `docker run`: prefix `MSYS_NO_PATHCONV=1`.
 - **Files the next task needs:** `docs/PLAN.md` (Phase 6), `.claude/rules/gateway.md`, `services/gateway/src` (callTool path).
