@@ -25,3 +25,5 @@ td.actions { white-space: nowrap; display: flex; gap: 0.3rem; }
 .chat-pending { border-color: #0b5cd5; }
 .chat-input { display: flex; flex-direction: column; gap: 0.5rem; max-width: 720px; }
 .chat-input label { display: flex; flex-direction: column; gap: 0.2rem; }
+.chat-card p, .chat-card pre { overflow-wrap: anywhere; }
+.chat-card pre { white-space: pre-wrap; }
