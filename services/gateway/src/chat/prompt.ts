@@ -14,7 +14,6 @@ Answer in plain text. The screen shows your words literally, so never use markdo
 
 // Upstream text is untrusted: no control characters, one line of whitespace, bounded length.
 export function cleanText(text: string, max: number): string {
-  // eslint-disable-next-line no-control-regex
   return text.replace(/\s+/g, " ").replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim().slice(0, max);
 }
 
