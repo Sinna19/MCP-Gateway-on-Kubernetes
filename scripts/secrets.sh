@@ -97,3 +97,16 @@ else
     --from-literal=admin-password="$(openssl rand -hex 16)" >/dev/null
   echo "secret gateway-app: created"
 fi
+
+# LLM key for the chat agent (optional). Only created when LLM_API_KEY is set in your shell, so the key
+# never appears in a file or in the command line. Chat answers 503 until this Secret exists. Set it with:
+#   read -rs LLM_API_KEY; export LLM_API_KEY; scripts/secrets.sh; unset LLM_API_KEY
+# Wrong key typed? kubectl -n urumi delete secret llm-api, then repeat. Restart the gateway to pick it up.
+if kubectl -n "$NS" get secret llm-api >/dev/null 2>&1; then
+  echo "secret llm-api: exists, skipped"
+elif [ -n "${LLM_API_KEY:-}" ]; then
+  printf '%s' "$LLM_API_KEY" | kubectl -n "$NS" create secret generic llm-api --from-file=api-key=/dev/stdin >/dev/null
+  echo "secret llm-api: created"
+else
+  echo "secret llm-api: LLM_API_KEY not set, skipped (chat disabled)"
+fi

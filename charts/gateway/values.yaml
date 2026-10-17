@@ -16,6 +16,24 @@ ingress:
 dbSecret: gateway-db
 appSecret: gateway-app
 
+# Chat agent. Chat answers 503 "chat not configured" until baseUrl, model and the Secret key are all set.
+# The key lives only in Secret llm-api (key api-key), created by scripts/secrets.sh from $LLM_API_KEY.
+llm:
+  baseUrl: ""
+  model: ""
+  secret: llm-api
+
+# Tools chat may run without asking the user first. Everything else needs a confirm click.
+chat:
+  readOnlyTools:
+    - woo__list_products
+    - woo__list_orders
+    - woo__get_order
+    - fx__convert_currency
+    - fx__list_rates
+    - notes__list_notes
+    - notes__list_products
+
 # First upstream registered on first start (in-cluster woo-mcp Service).
 seedWooUrl: http://woo-mcp:3000/mcp
 
