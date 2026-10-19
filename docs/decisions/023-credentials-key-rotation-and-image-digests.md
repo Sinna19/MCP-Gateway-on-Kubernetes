@@ -35,7 +35,10 @@ The gateway is down from step 3 to step 6, about 30 s locally (Job plus pod star
 - **Only upstream credentials are re-encrypted.** API keys and passwords are stored as hashes, so they do not depend on `CREDENTIALS_KEY`.
 
 ## Images by digest
-Written in the next session (7f, second group).
+- **Why.** A tag like `postgres:17.6-alpine` is mutable: the registry owner can repoint it, so the same chart could run different bytes next month. A digest names exact content. Our own images are already content-addressed by the git tree hash tag.
+- **What.** Every third-party image is `name:tag@sha256:<index digest>` (the tag stays for readability; Kubernetes and Docker use the digest). Pinned in `charts/gateway/values.yaml` (postgres), `charts/store/values.yaml` (mariadb, wordpress, wp-cli) and every Dockerfile `FROM` including build stages (node, nginx-unprivileged). The digest is the multi-arch index digest, so it works on amd64 and arm64. The busybox probe in `.claude/rules/kubernetes.md` is pinned too.
+- **How to bump.** `docker buildx imagetools inspect IMAGE:TAG`, copy the top-level `Digest:`, update the values file or the FROM lines, then `make images && make deploy`. Changing a Dockerfile changes our image tag, so services roll once; Postgres, MariaDB and WordPress restart once when their digest changes.
+- **Trade-off.** No automatic security patches: a new base image only arrives when someone bumps the digest, so bumps are a manual recurring task.
 
 ## Consequences
 - After a rotation the old key exists nowhere in the cluster (backup Secret deleted after the check). A restored old Postgres backup would need the old key: keep the key with the backup.

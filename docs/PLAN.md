@@ -118,7 +118,7 @@ In this order:
 
 ### 7f Key and image hygiene
 - [x] CREDENTIALS_KEY rotation: script re-encrypts upstream credentials from the old key to the new one, documented in an ADR (023; `make rotate-key`)
-- [ ] Pin images by digest in values (or document why tag + tree hash is enough)
+- [x] Pin images by digest in values and Dockerfiles (ADR 023; verified on cluster, `make dod` 8/8)
 - **Accept:** rotate on a running cluster, upstream calls still work; images pinned or the reason documented; `scripts/dod-check.sh` rerun.
 
 ### 7g Full manual rehearsal
