@@ -1,20 +1,14 @@
 # Handoff
-- **Done this session (7c part 2 verify, no code changed):**
-  - Chat cap: `dailyCap=1` gave 200 then 429 + `Retry-After: 58875`, `chat_usage` row count=1; `make deploy` reverted, env `CHAT_DAILY_CAP=200`.
-  - Session cap: member key, 10 initializes 200, 11th 429 with JSON-RPC body (`-32000`, "too many open sessions for this key (10)").
-  - Revoke closes sessions: an open SSE stream ended 3s in (right when the key was revoked), well before its 25s curl timeout.
-  - Expired sweep: inserted an expired `sessions` row, restarted, log `swept 1 expired sessions`, row gone.
-  - `last_used_at`: two `/mcp` requests 5s apart left it unchanged in psql.
-  - `make dod` 8/8 after a gateway restart.
-  - a6c6dc7 docs(adr): ADR 020 part 2 decisions, rules limits line, 7c boxes ticked. 7c is complete.
+- **Done this session (7d part 1, woo-mcp):**
+  - 83861a1 feat(woo-mcp): password read from the mounted file `woo-api/password` on every request, one retry on a Woo 401 only if the file changed; `/mcp` needs a bearer token (`src/auth.ts`, constant-time); 401 logs one line without the token. Chart mounts the Secret (no subPath) and takes `WOO_MCP_TOKEN` from Secret `woo-mcp-token`; `secrets.sh` creates it if missing; `register-upstreams.sh` sets it on woo (no printing). 48 woo-mcp tests, `make lint`/`make test` ok.
+  - c154107 docs: ADR 021 (incl. token rotation), README quick start adds `make register`, store rules updated, 7d first two boxes ticked.
+  - Verified on the cluster: no token and wrong token both gave 401 (node fetch via `kubectl exec` in the gateway pod), woo-mcp log shows one line per rejection. Password regenerated (Secret hash changed, old app password deleted): same pod, RESTARTS 0, `readyz` 200 and `list_products` ok after kubelet synced the file. `make dod` 8/8.
 - **In progress:** nothing.
-- **Next step:** `7 7d upstream and audit fixes` (first group: woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401).
+- **Next step:** `7 7d upstream and audit fixes, part 2`: fx-mcp and notes-mcp log one line on 401 (never the key); audit records tool args (size-capped, never secrets) and declined chat confirms as rows. Then tick the last two 7d boxes.
 - **Gotchas learned:**
-  - A 401 after revoking a key only proves the per-request revocation check. To prove sessions are closed, hold an SSE stream (`GET /mcp` with `Mcp-Session-Id`) open and revoke: it ends at once.
-  - `swept N expired sessions` is logged by the first sweep tick, about 60s after a restart; wait with an `until ... grep -q swept` loop, `sleep` chains are blocked.
-  - Secret `dod-member` has only a `password` key (user `dod-member@example.com`); admin login is in Secret `gateway-app` (`admin-email`, `admin-password`).
-  - psql in the pod: `kubectl -n urumi exec gateway-postgres-0 -- sh -c 'psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-$POSTGRES_USER}" -c "..."'`.
-  - Image tags are tree hashes: commit service changes before `make deploy`.
-  - `make lint && make test` takes over 2 min; use `run_in_background`.
-  - Parked: audit `args` and declined rows (7d); weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
-- **Files the next task needs:** `docs/PLAN.md` (7d), `services/woo-mcp/` (Woo auth code), `charts/woo-mcp/` templates and values, `.claude/rules/` for charts and the store.
+  - Do not wait for the `woo password changed on disk; retrying` log line. The client reads the file on every request, so after kubelet swaps the file (up to ~90s) the next request already has the new password and never sees a 401. The line only appears if the file changes mid-request; the unit tests cover that. Prove it by `readyz` 200 plus a `list_products` call from inside the woo-mcp pod (node fetch with `process.env.WOO_MCP_TOKEN`), same pod name, RESTARTS 0.
+  - To force a password regeneration: `kubectl patch secret woo-api --type=json -p '[{"op":"remove","path":"/data/password"}]'`, then `make deploy` (new setup Job revision recreates it and deletes the old app password).
+  - A fresh cluster needs `make deploy` then `make register`, or woo is Unreachable (401). 7g's rehearsal must do both.
+  - `make lint && make test` is slow; background it and wait with an `until`-style loop on a `done` marker (stale `/tmp` files can mislead).
+  - Parked: weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
+- **Files the next task needs:** `docs/PLAN.md` (7d), `services/fx-mcp/src/server.ts`, `services/notes-mcp/src/` (auth check), `services/gateway/src/` audit writer and chat confirm path, `.claude/rules/gateway.md`.
