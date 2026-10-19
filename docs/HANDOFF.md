@@ -1,14 +1,16 @@
 # Handoff
-- **Done this session (7f part 2, image digests, verified on the cluster):**
-  - c854499 every third-party image pinned as `name:tag@sha256:<index digest>`: postgres (`charts/gateway/values.yaml`), mariadb, wordpress, wp-cli (`charts/store/values.yaml`), all Dockerfile `FROM` lines incl. build stages (node, nginx-unprivileged), busybox probe example in `.claude/rules/kubernetes.md`.
-  - 3685c04 ADR 023 "Images by digest" filled (why, how to bump, trade-off); rotate-key finish recovery was already in the ADR. PLAN 7f ticked.
-  - Live: `make lint` ok, `make images`, `make deploy`, all 8 pods 1/1 Ready, RESTARTS 0, `make register` all connected, `make dod` 8/8.
-  - `kubectl get pods -n urumi` images: mariadb, postgres, wordpress and wp-cli show `@sha256:`; our `urumi/*` images use tree-hash tags (their bases are pinned in the Dockerfiles).
-- **In progress:** nothing. Tree is clean after this commit.
-- **Next step:** `7 7g full manual rehearsal`
+- **Done this session (7g part 1, fresh-cluster rehearsal):**
+  - 07f676e `docs/REHEARSAL.md` runbook (steps 1-8) plus results; `scripts/secrets.sh` comment now points at the argv-free LLM key one-liner.
+  - Cluster deleted and rebuilt from the runbook only: 5 images imported (crictl lists all 5), `make deploy` ok, 8 pods 1/1 RESTARTS 0, `make register` woo 5 / fx 2 / notes 3 connected.
+  - Rows 1-6b and 8 PASS (rows 1-6b by Ash in the browser; row 8 by `b-mcp.sh`, restricted call audited as an error row under B).
+- **In progress:** nothing half-finished. Resume at `docs/REHEARSAL.md` row 7 (table row "7 | B external client", `_pending, next_`) and row 9 (`_pending_`). 7g is NOT ticked in `docs/PLAN.md`; do not tag phase-7.
+- **Next step:** `7 7g rehearsal part 2: row 7 (MCP Inspector), row 9, then rows 10-17 and make dod`. **Do NOT delete or rebuild the cluster.** Users A (`admin@urumi.local`) and B (`b@example.com`, member) already exist.
 - **Gotchas learned:**
-  - `kubectl wait --for=condition=Ready pod --all` times out right after `make deploy` because the Completed `setup-*` pod never becomes Ready and pods were still rolling; check `kubectl get pods` instead.
-  - `docker buildx imagetools inspect IMAGE` first `Digest:` line is the index digest (use `grep -m1 '^Digest:'`).
-  - `k8s-reviewer` was not run on this chart change (values-only image strings); run it before the 7g rehearsal if wanted.
-  - Earlier gotchas still apply: `kubectl` on Windows needs `cygpath -m` for `/tmp` paths; first `make test` can stall (rerun once).
-- **Files the next task needs:** `docs/PLAN.md` (7g), `docs/ASSIGNMENT.md` (Definition of Done wording only), `scripts/dod-check.sh`, `Makefile` (cluster-up/images/deploy/register targets).
+  - B's key is in `/c/Users/aashi/.urumi-rehearsal/b.hdr` (outside the repo and the session scratchpad, so it survives `/clear`). Never cat/echo it, no `curl -v`/`--trace`; only `curl -H @file`. Delete the file and its dir at the end of part 2. `chmod` is a no-op on NTFS (stat shows 644); the Windows ACL (user, SYSTEM, Administrators) is the protection.
+  - `b-mcp.sh` lived in the old session scratchpad and is gone: recreate it (curl: initialize, read `Mcp-Session-Id` from the response headers, `notifications/initialized`, then `tools/list` or `tools/call`, parse `data:` lines of the SSE reply, DELETE the session at the end).
+  - Row 13 disabling B also kills B's dashboard session: B logs in again before row 15.
+  - "today" is the UTC day for the chat agent (recorded in REHEARSAL.md as a known limitation, not a bug).
+  - Browser autofill may fill the old cluster's passwords; use the one-liners in REHEARSAL.md step 8.
+  - Hidden-input steps (LLM key done; any new secret) are Ash's one-liners, never `read -s` through Claude Code.
+  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths.
+- **Files the next task needs:** `docs/REHEARSAL.md` (rows and the runbook), `docs/PLAN.md` (tick 7g at the end), `scripts/dod-check.sh` (only run it), `Makefile` (`rotate-key`, `register`, `dod`).
