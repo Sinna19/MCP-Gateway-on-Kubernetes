@@ -79,8 +79,8 @@ Stretch: none left. Tool permissions per role (stand-out #2) is now in phase 7 (
 Tasks 7a to 7g, one per session. Every task's Accept includes rerunning `scripts/dod-check.sh`.
 
 ### 7a DoD script
-- [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled. Includes the disabled-server check.
-- [ ] Run it now as a baseline and report PASS/FAIL per check.
+- [x] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled. Includes the disabled-server check.
+- [x] Run it now as a baseline and report PASS/FAIL per check.
 - **Accept:** script runs end to end; PASS/FAIL per check reported; `scripts/dod-check.sh` rerun shows the same result.
 
 ### 7b NetworkPolicies
