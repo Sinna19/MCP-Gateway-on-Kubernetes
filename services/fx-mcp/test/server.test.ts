@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createHttpServer } from "../src/server.js";
@@ -54,6 +54,19 @@ describe("auth", () => {
     const headers = { ...mcpHeaders, Authorization: `Bearer ${randomBytes(24).toString("hex")}` };
     const res = await fetch(`${await start()}/mcp`, { method: "POST", headers, body: initialize });
     expect(res.status).toBe(401);
+  });
+
+  it("logs one line per 401 and never the sent token", async () => {
+    const base = await start();
+    const wrong = randomBytes(24).toString("hex");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await fetch(`${base}/mcp`, { method: "POST", headers: { ...mcpHeaders, Authorization: `Bearer ${wrong}` }, body: initialize });
+    await fetch(`${base}/mcp`, { method: "POST", headers: mcpHeaders, body: initialize });
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0]![0]).toBe("rejected POST /mcp: missing or wrong bearer token");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(wrong);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(token);
+    warn.mockRestore();
   });
 
   it("probes need no token", async () => {

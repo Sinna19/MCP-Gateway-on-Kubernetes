@@ -40,6 +40,8 @@ function send(res: ServerResponse, status: number, body: string): void {
 // Stateless: every POST builds a fresh MCP server and transport, so there is no session to lose on restart.
 async function handleMcp(req: IncomingMessage, res: ServerResponse, token: string): Promise<void> {
   if (!checkBearer(req.headers.authorization, token)) {
+    // One line, no header value: same shape as woo-mcp.
+    console.warn(`rejected ${req.method} /mcp: missing or wrong bearer token`);
     res.writeHead(401, { "Content-Type": "text/plain", "WWW-Authenticate": "Bearer" }).end("unauthorized");
     return;
   }

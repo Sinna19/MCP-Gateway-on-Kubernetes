@@ -41,6 +41,8 @@ function send(res: ServerResponse, status: number, body: string): void {
 // Stateless: every POST builds a fresh MCP server and transport, so there is no session to lose on restart.
 async function handleMcp(req: IncomingMessage, res: ServerResponse, key: string, store: NoteStore): Promise<void> {
   if (!checkKey(req.headers["x-notes-key"] as string | undefined, key)) {
+    // One line, no header value: same shape as woo-mcp.
+    console.warn(`rejected ${req.method} /mcp: missing or wrong x-notes-key header`);
     res.writeHead(401, { "Content-Type": "text/plain" }).end("unauthorized");
     return;
   }
