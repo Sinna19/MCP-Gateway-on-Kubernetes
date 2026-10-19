@@ -10,9 +10,10 @@ interface AuditRow {
   tool: string;
   startedAt: string;
   durationMs: number;
-  outcome: "ok" | "error";
+  outcome: "ok" | "error" | "declined";
   error: string | null;
   source: "mcp" | "chat";
+  args?: unknown; // null for rows from before args were stored
 }
 
 interface MemberOption {
@@ -112,6 +113,7 @@ export function Audit() {
             <option value="">Any</option>
             <option value="ok">ok</option>
             <option value="error">error</option>
+            <option value="declined">declined</option>
           </select>
         </label>
         <label>
@@ -140,10 +142,11 @@ export function Audit() {
               <th>Duration</th>
               <th>Outcome</th>
               <th>Error</th>
+              <th>Args</th>
             </tr>
           </thead>
           <tbody>
-            {/* Server, tool and error come from upstreams and callers: plain text children only. */}
+            {/* Server, tool, error and args come from upstreams and callers: plain text children only. */}
             {rows.map((r) => (
               <tr key={r.id}>
                 <td>{when(r.startedAt)}</td>
@@ -154,6 +157,14 @@ export function Audit() {
                 <td>{r.durationMs} ms</td>
                 <td>{r.outcome}</td>
                 <td>{r.error ?? ""}</td>
+                <td>
+                  {r.args != null && (
+                    <details>
+                      <summary>args</summary>
+                      <pre>{JSON.stringify(r.args, null, 2)}</pre>
+                    </details>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

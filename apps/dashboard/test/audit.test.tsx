@@ -95,6 +95,34 @@ describe("audit page", () => {
     expect(document.querySelector("tbody b, tbody i")).toBeNull();
   });
 
+  it("shows args collapsed by default and as plain text when opened", async () => {
+    const evil = { note: "<img src=x onerror=alert(1)>", token: "[redacted]" };
+    stubApi(gateway(admin, () => ({ status: 200, body: [row(1, { args: evil })] })));
+    await openAudit();
+    const summary = await screen.findByText("args", { selector: "summary" });
+    const details = summary.closest("details")!;
+    expect(details.open).toBe(false);
+    await userEvent.click(summary);
+    expect(details.open).toBe(true);
+    expect(details.querySelector("pre")?.textContent).toBe(JSON.stringify(evil, null, 2));
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("has no args control for a row without args", async () => {
+    stubApi(gateway(admin, () => ({ status: 200, body: [row(1, { args: null }), row(2)] })));
+    await openAudit();
+    await screen.findAllByText("list_products", { selector: "td" });
+    expect(document.querySelector("details")).toBeNull();
+  });
+
+  it("offers the declined outcome as a filter and shows declined rows", async () => {
+    const { calls } = stubApi(gateway(admin, () => ({ status: 200, body: [row(1, { outcome: "declined", source: "chat", args: { name: "W" } })] })));
+    await openAudit();
+    expect(await screen.findByText("declined", { selector: "td" })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Outcome"), "declined");
+    await waitFor(() => expect(calls.some((c) => c.startsWith("GET /audit") && c.includes("outcome=declined"))).toBe(true));
+  });
+
   it("shows (deleted) for a removed user and - for a missing server", async () => {
     stubApi(gateway(admin, () => ({ status: 200, body: [row(1, { user: null, server: null })] })));
     await openAudit();
