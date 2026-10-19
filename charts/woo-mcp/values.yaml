@@ -11,6 +11,9 @@ wooUrl: http://store-wordpress
 # Secret created by scripts/secrets.sh (username) and the store setup Job (password). Keys: username, password.
 existingSecret: woo-api
 
+# Secret created by scripts/secrets.sh. Key: token. The gateway sends it as a bearer token (set by `make register`).
+tokenSecret: woo-mcp-token
+
 # Pods allowed to reach woo-mcp. Only the gateway.
 allowedClientLabel:
   app.kubernetes.io/name: gateway

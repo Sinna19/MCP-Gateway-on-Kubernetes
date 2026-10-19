@@ -74,6 +74,15 @@ else
   echo "secret fx-mcp-token: created"
 fi
 
+# Bearer token woo-mcp requires on /mcp (same shape as fx-mcp-token). `make register` sets it on the woo server.
+if kubectl -n "$NS" get secret woo-mcp-token >/dev/null 2>&1; then
+  echo "secret woo-mcp-token: exists, skipped"
+else
+  kubectl -n "$NS" create secret generic woo-mcp-token \
+    --from-literal=token="$(openssl rand -hex 32)" >/dev/null
+  echo "secret woo-mcp-token: created"
+fi
+
 # Static header key notes-mcp requires on /mcp (X-Notes-Key; 32 random bytes as hex; notes-mcp refuses under 32 chars).
 # The admin pastes it into the gateway as a header credential. Read it with:
 #   kubectl -n urumi get secret notes-mcp-key -o jsonpath='{.data.key}' | base64 -d

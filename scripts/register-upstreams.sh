@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Registers fx and notes in the gateway through its admin API (same calls the dashboard makes).
+# Registers woo (token), fx and notes in the gateway through its admin API (same calls the dashboard makes).
 # Safe to re-run: an existing server is PATCHed (url + credential, never `enabled`). Prints no secrets.
 # Secrets reach jq through environment variables, never as command-line arguments (those show up in `ps`).
 set -euo pipefail
@@ -26,6 +26,7 @@ secret() { kubectl -n "$NS" get secret "$1" -o jsonpath="{.data.$2}" | base64 -d
 
 ADMIN_EMAIL="$(secret gateway-app admin-email)"
 ADMIN_PASSWORD="$(secret gateway-app admin-password)"
+WOO_TOKEN="$(secret woo-mcp-token token)"
 FX_TOKEN="$(secret fx-mcp-token token)"
 NOTES_KEY="$(secret notes-mcp-key key)"
 
@@ -70,11 +71,12 @@ register() {
   esac
 }
 
+register woo "http://woo-mcp:3000/mcp" "$(T="$WOO_TOKEN" jq -n '{type:"bearer",token:env.T}')"
 register fx "http://fx-mcp:3000/mcp" "$(T="$FX_TOKEN" jq -n '{type:"bearer",token:env.T}')"
 register notes "http://notes-mcp:3000/mcp" "$(V="$NOTES_KEY" jq -n '{type:"header",name:"X-Notes-Key",value:env.V}')"
 
-# Status can lag behind the write: wait up to ~30s for every enabled one of the two to connect.
-mine='select(.slug == "fx" or .slug == "notes")'
+# Status can lag behind the write: wait up to ~30s for every enabled one of the three to connect.
+mine='select(.slug == "woo" or .slug == "fx" or .slug == "notes")'
 want="$(list_servers | jq "[.[] | $mine | select(.enabled)] | length" | tr -d '\r')"
 n=0
 for _ in $(seq 1 30); do

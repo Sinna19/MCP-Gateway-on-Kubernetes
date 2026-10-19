@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { checkBearer } from "./auth.js";
 import { registerTools } from "./tools.js";
 import type { WooClient } from "./woo-client.js";
 
@@ -38,7 +39,13 @@ function send(res: ServerResponse, status: number, body: string): void {
 }
 
 // Stateless: every POST builds a fresh MCP server and transport, so there is no session to lose on restart.
-async function handleMcp(req: IncomingMessage, res: ServerResponse, woo: WooClient): Promise<void> {
+async function handleMcp(req: IncomingMessage, res: ServerResponse, woo: WooClient, token: string): Promise<void> {
+  if (!checkBearer(req.headers.authorization, token)) {
+    // One line, never the header: it would hold the caller's token.
+    console.warn(`rejected ${req.method} /mcp: missing or wrong bearer token`);
+    res.writeHead(401, { "Content-Type": "text/plain", "WWW-Authenticate": "Bearer" }).end("unauthorized");
+    return;
+  }
   if (req.method !== "POST") {
     res.writeHead(405, { Allow: "POST" }).end();
     return;
@@ -62,7 +69,7 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse, woo: WooClie
   await transport.handleRequest(req, res, body);
 }
 
-export function createHttpServer(deps: { woo: WooClient }): Server {
+export function createHttpServer(deps: { woo: WooClient; token: string }): Server {
   const server = createServer((req, res) => {
     const path = (req.url ?? "").split("?")[0];
     if (path === "/healthz") return send(res, 200, "ok");
@@ -75,7 +82,7 @@ export function createHttpServer(deps: { woo: WooClient }): Server {
       return;
     }
     if (path === "/mcp") {
-      handleMcp(req, res, deps.woo).catch((err: unknown) => {
+      handleMcp(req, res, deps.woo, deps.token).catch((err: unknown) => {
         console.error("mcp request failed:", err instanceof Error ? err.message : err);
         if (!res.headersSent) send(res, 500, "internal error");
       });

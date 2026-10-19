@@ -5,15 +5,64 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-function client(fetchImpl: typeof fetch, timeoutMs = 1000) {
+function client(fetchImpl: typeof fetch, timeoutMs = 1000, readPassword: () => string = () => "app pass") {
   return createWooClient({
     baseUrl: "http://store-wordpress/",
     user: "woo-mcp",
-    password: "app pass",
+    readPassword,
     timeoutMs,
     fetch: fetchImpl,
   });
 }
+
+const basic = (password: string) => "Basic " + Buffer.from(`woo-mcp:${password}`).toString("base64");
+
+describe("password re-read on 401", () => {
+  it("retries once with the new password when the file changed", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(401, { message: "Invalid credentials." }))
+      .mockResolvedValueOnce(jsonResponse(200, [{ id: 1 }]));
+    const passwords = ["old pass", "new pass"];
+    const read = vi.fn(() => passwords.shift() ?? "new pass");
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const out = await client(fetchMock, 1000, read).request("GET", "/products");
+
+    expect(out).toEqual([{ id: 1 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]![1].headers.Authorization).toBe(basic("old pass"));
+    expect(fetchMock.mock.calls[1]![1].headers.Authorization).toBe(basic("new pass"));
+    expect(log).toHaveBeenCalledOnce();
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/old pass|new pass/);
+    log.mockRestore();
+  });
+
+  it("does not retry when the password on disk is unchanged", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(401, { message: "Invalid credentials." }));
+    const err = await client(fetchMock).request("GET", "/products").catch((e: unknown) => e);
+    expect((err as WooError).message).toBe("WooCommerce returned 401: Invalid credentials.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries only once even if the second try is also 401", async () => {
+    // A new Response per call: a body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(async () => jsonResponse(401, { message: "Invalid credentials." }));
+    let n = 0;
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const err = await client(fetchMock, 1000, () => `pass ${n++}`).request("GET", "/products").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WooError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    log.mockRestore();
+  });
+
+  it("a non-401 error does not re-read the file", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(404, { message: "Invalid ID." }));
+    const read = vi.fn(() => "app pass");
+    await client(fetchMock, 1000, read).request("GET", "/orders/9").catch(() => {});
+    expect(read).toHaveBeenCalledTimes(1); // only the first read, for the request itself
+  });
+});
 
 describe("woo client", () => {
   it("does not follow redirects and says what to check", async () => {

@@ -1,11 +1,19 @@
 // Thin client for the WooCommerce REST API v3. Basic auth with a WordPress Application Password.
 
-export class WooError extends Error {}
+export class WooError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
 export interface WooClientOptions {
   baseUrl: string;
   user: string;
-  password: string;
+  // Called on every request. Reads a mounted Secret file, so a regenerated password is picked up without a restart.
+  readPassword: () => string;
   timeoutMs: number;
   fetch?: typeof fetch;
 }
@@ -27,10 +35,26 @@ export interface WooClient {
 export function createWooClient(opts: WooClientOptions): WooClient {
   const doFetch = opts.fetch ?? fetch;
   const base = opts.baseUrl.replace(/\/+$/, "");
-  const auth = "Basic " + Buffer.from(`${opts.user}:${opts.password}`).toString("base64");
+  const basicAuth = (password: string) => "Basic " + Buffer.from(`${opts.user}:${password}`).toString("base64");
+
+  // Sends with the password read for this request. If Woo answers 401 and the file now holds a different
+  // password, it was regenerated: retry once with the new one. Woo rejects a 401 before doing anything,
+  // so the retry is safe for POST and PUT too. An unchanged password is not retried, it would fail again.
+  async function send(method: string, path: string, query?: Query, body?: unknown) {
+    const password = opts.readPassword();
+    try {
+      return await sendOnce(basicAuth(password), method, path, query, body);
+    } catch (err) {
+      if (!(err instanceof WooError) || err.status !== 401) throw err;
+      const latest = opts.readPassword();
+      if (latest === password) throw err;
+      console.warn("woo password changed on disk; retrying");
+      return await sendOnce(basicAuth(latest), method, path, query, body);
+    }
+  }
 
   // One HTTP round trip. Every failure becomes a WooError with a message that is safe to show.
-  async function send(method: string, path: string, query?: Query, body?: unknown) {
+  async function sendOnce(auth: string, method: string, path: string, query?: Query, body?: unknown) {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined) params.set(key, String(value));
@@ -72,7 +96,10 @@ export function createWooClient(opts: WooClientOptions): WooClient {
 
     if (!res.ok) {
       const message = isJson ? (data as { message?: unknown } | undefined)?.message : undefined;
-      throw new WooError(`WooCommerce returned ${res.status}${typeof message === "string" ? `: ${message}` : ""}`);
+      throw new WooError(
+        `WooCommerce returned ${res.status}${typeof message === "string" ? `: ${message}` : ""}`,
+        res.status,
+      );
     }
     // A 200 with HTML usually means WordPress permalinks are broken and /wp-json/ is not routed.
     if (!isJson) throw new WooError("WooCommerce returned an unexpected non-JSON response");

@@ -23,6 +23,14 @@ spec:
         runAsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: woo-api
+          secret:
+            secretName: {{ .Values.existingSecret }}
+            # Only the password. The pod waits in ContainerCreating until the setup Job adds this key.
+            items:
+              - key: password
+                path: password
       containers:
         - name: woo-mcp
           image: "{{ .Values.image.repository }}:{{ required "image.tag must be set; use make deploy" .Values.image.tag }}"
@@ -45,12 +53,20 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: username
-            # Waits in CreateContainerConfigError until the store setup Job adds this key.
-            - name: WOO_APP_PASSWORD
+            # A file, not an env var: kubelet updates it in place when the setup Job regenerates the password.
+            - name: WOO_APP_PASSWORD_FILE
+              value: /var/run/secrets/woo/password
+            # Rotating this one needs a rollout restart (ADR 021).
+            - name: WOO_MCP_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: password
+                  name: {{ .Values.tokenSecret }}
+                  key: token
+          volumeMounts:
+            # No subPath: kubelet does not update subPath mounts.
+            - name: woo-api
+              mountPath: /var/run/secrets/woo
+              readOnly: true
           # The process is up. Does not depend on WordPress, so a store outage never restarts us.
           livenessProbe:
             httpGet:
