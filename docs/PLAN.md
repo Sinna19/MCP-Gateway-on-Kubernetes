@@ -117,7 +117,7 @@ In this order:
 - **Accept:** member cannot see or call `create_product` / `update_order_status` over MCP or chat; admin can; `scripts/dod-check.sh` rerun.
 
 ### 7f Key and image hygiene
-- [ ] CREDENTIALS_KEY rotation: script re-encrypts upstream credentials from the old key to the new one, documented in an ADR
+- [x] CREDENTIALS_KEY rotation: script re-encrypts upstream credentials from the old key to the new one, documented in an ADR (023; `make rotate-key`)
 - [ ] Pin images by digest in values (or document why tag + tree hash is enough)
 - **Accept:** rotate on a running cluster, upstream calls still work; images pinned or the reason documented; `scripts/dod-check.sh` rerun.
 

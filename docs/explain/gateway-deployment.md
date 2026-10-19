@@ -101,6 +101,6 @@ Bonus "why not X": *Why not Ingress for woo-mcp?* It would put store write acces
 7. **No `startupProbe` on the gateway.** Liveness starts at once. Migrations plus upstream connects take a few seconds, so a slow cluster could trigger a restart loop (3 x 20 s = 60 s margin). It has not been a problem so far.
 8. **Postgres:** a single replica, no backups, no `readOnlyRootFilesystem` (it needs a writable data dir plus `/var/run/postgresql`), and 1Gi `local-path` data is lost if the node or PVC is lost. `helm uninstall` leaves the PVC, but deleting the namespace removes it.
 9. **SIGTERM calls `server.closeAllConnections()`** (`index.ts:30`): in-flight tool calls are cut off immediately, and their audit rows may not be written.
-10. **`CREDENTIALS_KEY` has no rotation story.** Changing it makes every stored credential undecryptable (it fails to connect, shown as unreachable). It would need a re-encrypt migration.
+10. **`CREDENTIALS_KEY` rotation is a planned outage.** Do not edit the Secret by hand (every stored credential becomes undecryptable). `make rotate-key` re-encrypts in one transaction while the gateway is scaled to 0 (~30s down), see ADR 023.
 11. **Secrets in k3s are base64 in etcd, not encrypted at rest** unless enabled. Same for the VPS.
 12. **The seeded woo upstream has no auth header.** The gateway to woo-mcp hop relies solely on the NetworkPolicy plus label trust.
