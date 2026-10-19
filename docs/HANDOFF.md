@@ -1,17 +1,21 @@
 # Handoff
-- **Done this session (7c part 1):**
-  - ca1b681 feat(gateway): revoke key / disable user / role change close the user's `/mcp` sessions and SSE streams; login rate limit (IP 30 + email 5 per 15 min, 429 + Retry-After); per-key `/mcp` `tools/call` limit (60/min). Limiter is `src/rate-limit.ts`; limits in `charts/gateway/values.yaml` `limits:`.
-  - 22b5d33 docs: ADR 020, ADR 014 gap closed, gateway rules, PLAN first three 7c boxes ticked.
-  - Cluster proof: 32 logins with distinct emails + spoofed XFF hit 429 after 30 (Traefik overwrites XFF); 6th wrong login for one email 429; 61 `fx__does_not_exist` calls gave 60x200 then 429 Retry-After; revoke ended a running SSE curl. `make lint`, `make test` (275), `make dod` 8/8.
-  - Quiz on the chat agent from an earlier session is still unanswered by Ash.
-- **In progress:** nothing.
-- **Next step:** `7 7c Gateway limits and cleanup, part 2`: per-user daily chat cap, `/mcp` session cap per key + sweep failed-initialize sessions, expired-session sweep (Postgres `sessions`), throttle `api_keys.last_used_at` to once a minute. Reuse `FixedWindowLimiter` only where in-memory fits; the chat cap is a Postgres counter by plan.
+- **Done this session (7c part 2, code only):**
+  - 2ed3c8f feat(gateway): daily chat cap (`chat_usage`, migration 004, `chat/daily-cap.ts`, agent `beforeTurn` hook, 429 + Retry-After), `/mcp` session cap per key (default 10, 429 + JSON-RPC, no eviction), sessions that never send `notifications/initialized` closed by the 60s sweep, hourly purge of expired `sessions` and old `chat_usage` in `app.sweep`, `last_used_at` written at most once a minute per key (`KeyUsage`, per app). Dashboard shows the gateway's 429 text.
+  - Chart: `limits.mcp.sessionsPerKey` (10), `limits.chat.dailyCap` (200) in values + env in `deployment.yaml`.
+  - `make lint` clean; gateway 296 tests and dashboard tests pass (dashboard chat test updated for the 429 text).
+  - `make deploy` done; gateway rolled out Ready (1/1), logs show "gateway listening on :8080". No cluster checks run yet, by decision.
+- **In progress (uncommitted in the working tree):** edits to `docs/decisions/020-gateway-rate-limits.md` (four part 2 decisions + trade-offs) and `.claude/rules/gateway.md` (limits line). Review them, commit after the cluster checks. PLAN 7c boxes 4 to 7 are NOT ticked yet.
+- **Next step:** `7 7c cluster checks and close-out for part 2`: run the checks below, `make dod`, then tick the four 7c boxes in `docs/PLAN.md`, commit ADR/rules/PLAN.
+  - Chat cap: `helm upgrade platform charts/platform -n urumi --reuse-values --set gateway.limits.chat.dailyCap=1`, admin cookie via curl, 2x `POST /api/chat` gives 200 then 429 + Retry-After, psql `SELECT * FROM chat_usage`; revert with `make deploy` and confirm env `CHAT_DAILY_CAP=200`.
+  - Session cap: fresh member key, 11 initializes gives 10x200 then 429; revoke the key and show sessions closed.
+  - Expired sessions: insert an expired row in `sessions`, restart gateway, see `swept 1 expired sessions` in the log after about 60s.
+  - `last_used_at`: two `/mcp` requests 5s apart, value unchanged in psql.
+  - `make dod` 8/8 (restart gateway first if login tests ran).
 - **Gotchas learned:**
-  - Cluster login tests share one source IP (k3d): 30 failed logins lock it for 15 min. Reset with `kubectl -n urumi rollout restart deploy/gateway` (limiter is in memory). Do not run the XFF spray test right before `make dod` without restarting.
-  - A 429 from the per-email bucket does not prove XFF is overwritten; use many distinct emails against the IP limit.
-  - `findUserByKey` writes `last_used_at` on every request (the part 2 throttle goes there, `src/api-keys.ts`).
-  - Docker Desktop must be running before kubectl/k3d; after a restart `k3d cluster start urumi`.
-  - dod-check uses member `dod-member@example.com` (Secret `dod-member`); 19 MCP requests, 12 on the busiest key, well under 60/min.
-  - Parked: audit `args` column and `declined` rows (7d); weak points in `docs/explain/chat-agent.md` section 14.
-  - `make lint && make test` takes over 2 min; run with `run_in_background`.
-- **Files the next task needs:** `docs/PLAN.md` (7c), `docs/decisions/020-gateway-rate-limits.md`, `.claude/rules/gateway.md`, `services/gateway/src/{mcp-endpoint,api-keys,sessions,app,config,index}.ts`, `src/api/chat.ts`, `src/chat/agent.ts`, `charts/gateway/values.yaml`.
+  - Image tags are tree hashes: commit service changes before `make deploy`, or the pod keeps the old image.
+  - pg returns bigint ids as strings: `KeyUsage` is keyed by `Number(id)`; `createKey` returns a string id in tests.
+  - Existing `/mcp` tests that advance the clock must send `notifications/initialized`, or the new handshake sweep closes the session.
+  - Cap check order: busy check, then cap (inside `ChatAgent.run`). A confirm with an unknown id or a bad history still spends a turn (in ADR trade-offs).
+  - `make lint && make test` takes over 2 min; use `run_in_background`.
+  - Parked: audit `args` and declined rows (7d); weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
+- **Files the next task needs:** `docs/PLAN.md` (7c), `docs/decisions/020-gateway-rate-limits.md`, `scripts/dod-check.sh`, `charts/gateway/values.yaml`, `deploy/values-local.yaml`.
