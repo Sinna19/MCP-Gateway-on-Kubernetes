@@ -1,0 +1,28 @@
+{{- if .Values.notes }}
+# notes-mcp keeps notes in memory and calls nobody; DNS is all it may use. Ingress is in notes-mcp-networkpolicy.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: notes-mcp-egress
+  labels:
+    app.kubernetes.io/name: notes-mcp
+    {{- include "upstreams.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notes-mcp
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}

@@ -1,0 +1,57 @@
+# Ingress: the browser comes through Traefik, woo-mcp calls the REST API. Nobody else.
+# Egress: DNS, MariaDB, and public HTTPS (plugin and WooCommerce calls). Private ranges stay blocked.
+# Ports are container ports (wordpress-deployment.yaml and mariadb-statefulset.yaml hard-code 80 and 3306).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: store-wordpress
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wordpress
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.ingressController.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.ingressController.podLabels | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: woo-mcp
+      ports:
+        - port: 80
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mariadb
+      ports:
+        - port: 3306
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.global.network.privateRanges | nindent 14 }}
+      ports:
+        - port: 443
+          protocol: TCP

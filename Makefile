@@ -60,7 +60,7 @@ register:
 lint: deps
 	@fail=0; \
 	for c in $(CHARTS); do \
-	  out=$$(helm lint charts/$$c -f deploy/values-local.yaml --set image.tag=lint --set fx.image.tag=lint --set notes.image.tag=lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
+	  out=$$(helm lint charts/$$c -f charts/platform/values.yaml -f deploy/values-local.yaml --set image.tag=lint --set fx.image.tag=lint --set notes.image.tag=lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
 	for v in local prod; do \
 	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint --set dashboard.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \

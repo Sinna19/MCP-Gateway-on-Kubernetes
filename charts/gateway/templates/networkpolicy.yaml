@@ -1,0 +1,64 @@
+# Ingress: only Traefik. Egress: DNS, its Postgres, the upstream MCP servers, and public HTTPS (LLM, external upstreams).
+# The ipBlock leaves out private ranges, so the Kubernetes API, WordPress and metadata endpoints are unreachable even if
+# an admin registers such a URL. url-guard checks first; this is the second layer (ADR 019).
+# Ports are container ports. Upstreams all listen on upstreamPort.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.ingressController.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.ingressController.podLabels | nindent 14 }}
+      ports:
+        - port: {{ .Values.port }}
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway-postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [woo-mcp, fx-mcp, notes-mcp]
+      ports:
+        - port: {{ .Values.networkPolicy.upstreamPort }}
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.global.network.privateRanges | nindent 14 }}
+      ports:
+        - port: 443
+          protocol: TCP

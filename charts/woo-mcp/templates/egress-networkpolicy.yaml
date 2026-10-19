@@ -1,0 +1,34 @@
+# woo-mcp only talks to WordPress (and DNS to find it). The ingress side is in networkpolicy.yaml.
+# Port 80 is WordPress's container port (hard-coded in charts/store wordpress-deployment.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woo-mcp-egress
+  labels:
+    app.kubernetes.io/name: woo-mcp
+    {{- include "woo-mcp.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: woo-mcp
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wordpress
+      ports:
+        - port: 80
+          protocol: TCP

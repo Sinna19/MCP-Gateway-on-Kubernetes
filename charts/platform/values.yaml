@@ -5,3 +5,20 @@ global:
   ingress:
     className: traefik
     tls: false
+  # Who the NetworkPolicies treat as the ingress controller and DNS. Namespaces match on kubernetes.io/metadata.name.
+  network:
+    ingressController:
+      namespace: kube-system
+      podLabels:
+        app.kubernetes.io/name: traefik
+    dns:
+      namespace: kube-system
+      podLabels:
+        k8s-app: kube-dns
+    # Public egress (TCP 443) is everything except these ranges. Same ranges as services/gateway/src/url-guard.ts.
+    privateRanges:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 169.254.0.0/16
+      - 100.64.0.0/10

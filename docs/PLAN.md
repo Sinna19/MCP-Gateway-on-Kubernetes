@@ -85,12 +85,12 @@ Tasks 7a to 7g, one per session. Every task's Accept includes rerunning `scripts
 
 ### 7b NetworkPolicies
 Verify each with one blocked and one allowed curl (k3s rejects = exit 7; new pods need ~10s for policy sync).
-- [ ] MariaDB ingress only from WordPress + setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`)
-- [ ] woo-mcp egress only to store-wordpress + DNS (kube-system CoreDNS); check what phase 2 already has
-- [ ] Gateway ingress only from Traefik (kube-system)
-- [ ] Gateway egress: DNS, Postgres, the three upstream pods, TCP 443 to 0.0.0.0/0 except 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (LLM host must stay reachable). Closes the SSRF gap in ADR 009.
-- [ ] fx-mcp and notes-mcp: ingress from gateway only, deny all egress except DNS
-- [ ] Dashboard: ingress from Traefik only, deny egress
+- [x] MariaDB ingress only from WordPress + setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`)
+- [x] woo-mcp egress only to store-wordpress + DNS (kube-system CoreDNS); check what phase 2 already has
+- [x] Gateway ingress only from Traefik (kube-system)
+- [x] Gateway egress: DNS, Postgres, the three upstream pods, TCP 443 to 0.0.0.0/0 except 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (LLM host must stay reachable). Closes the SSRF gap in ADR 009.
+- [x] fx-mcp and notes-mcp: ingress from gateway only, deny all egress except DNS
+- [x] Dashboard: ingress from Traefik only, deny egress
 - **Accept:** one blocked and one allowed curl per policy shown; `scripts/dod-check.sh` rerun.
 
 ### 7c Gateway limits and cleanup

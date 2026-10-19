@@ -25,3 +25,6 @@ The database is part of the gateway's state, so one chart owns it, and a separat
 - No Postgres backups yet (Phase 8). Gateway ingress is not yet limited to Traefik (Phase 7).
 - Each rollout drops open `/mcp` sessions; clients re-initialise.
 - **SSRF scope (review finding #1).** An admin supplies upstream URLs, so `src/url-guard.ts` refuses `localhost`, `*.localhost`, loopback (127/8, ::1), link-local (169.254/16, fe80::/10, so the cloud metadata address) and unspecified (0.0.0.0, ::) hosts. It runs at registration (400) and again on every resolved IP at connect time (server shows Unreachable). Private ranges (10/8, 172.16/12, 192.168/16) are allowed on purpose: in-cluster upstreams live there, so an admin can still point the gateway at other pods or services. This is not full SSRF protection. Between our lookup and fetch's own lookup a DNS answer can change (rebinding), and the gateway can still reach any private address. The real fix is a gateway egress NetworkPolicy (Phase 7). Tests opt out of the loopback block with `allowLoopback`; production has no setting for it.
+
+
+Update (ADR 019): the gateway egress NetworkPolicy now exists, so the SSRF gap above is closed; url-guard stays as the first layer.

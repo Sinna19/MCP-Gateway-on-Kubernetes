@@ -1,0 +1,14 @@
+# The database never starts connections. The ingress side is in postgres-networkpolicy.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-postgres-egress
+  labels:
+    app.kubernetes.io/name: gateway-postgres
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-postgres
+  policyTypes: [Egress]
+  egress: []

@@ -1,0 +1,25 @@
+# The database holds all store data, so only WordPress and the setup Job may connect, and MariaDB itself calls nobody.
+# Ports are container ports: kube-router checks after the Service is translated to the pod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: store-mariadb
+  labels:
+    app.kubernetes.io/name: mariadb
+    {{- include "store.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mariadb
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [wordpress, setup]
+      ports:
+        - port: 3306
+          protocol: TCP
+  egress: []

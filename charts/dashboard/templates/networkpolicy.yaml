@@ -1,0 +1,26 @@
+# The dashboard is static files served by nginx. Only Traefik connects, and it calls nobody
+# (nginx.conf has no proxy_pass: the Ingress sends /api and /mcp straight to the gateway).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard
+  labels:
+    app.kubernetes.io/name: dashboard
+    {{- include "dashboard.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dashboard
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.ingressController.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.ingressController.podLabels | nindent 14 }}
+      ports:
+        - port: {{ .Values.port }}
+          protocol: TCP
+  egress: []

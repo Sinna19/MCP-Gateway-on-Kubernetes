@@ -1,0 +1,9 @@
+# Nothing in the namespace accepts connections unless another policy names it.
+# Egress is not denied namespace-wide: the store setup Job must reach the Kubernetes API (ADR 019).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
