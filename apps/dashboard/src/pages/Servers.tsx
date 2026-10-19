@@ -6,7 +6,7 @@ export interface Server {
   slug: string;
   enabled: boolean;
   status: "connected" | "unreachable" | "disabled";
-  tools: Array<{ name: string; description: string }>;
+  tools: Array<{ name: string; description: string; adminOnly?: boolean }>; // adminOnly: only admins get it
   url: string;
   headerName: string | null;
   hasCredential: boolean;
@@ -73,6 +73,9 @@ export function Servers() {
   }
 
   const toggle = (s: Server) => run(() => api(`/servers/${encodeURIComponent(s.slug)}`, { method: "PATCH", body: { enabled: !s.enabled } }));
+  // The rule is stored under the upstream's own tool name, so cut the "<slug>__" prefix off.
+  const setAdminOnly = (s: Server, toolName: string, adminOnly: boolean) =>
+    run(() => api(`/servers/${encodeURIComponent(s.slug)}/tools/${encodeURIComponent(toolName.slice(s.slug.length + 2))}`, { method: "PATCH", body: { adminOnly } }));
   const remove = (s: Server) => {
     if (!window.confirm(`Delete server '${s.slug}'? Its audit history is kept.`)) return Promise.resolve();
     return run(() => api(`/servers/${encodeURIComponent(s.slug)}`, { method: "DELETE" }));
@@ -112,7 +115,14 @@ export function Servers() {
                     <summary>{s.tools.length} tools</summary>
                     <ul>
                       {s.tools.map((t) => (
-                        <li key={t.name}>{t.name}</li>
+                        <li key={t.name}>
+                          {t.name}
+                          {t.adminOnly !== undefined && (
+                            <label>
+                              <input type="checkbox" checked={t.adminOnly} onChange={(e) => void setAdminOnly(s, t.name, e.target.checked)} /> Admins only
+                            </label>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   </details>
