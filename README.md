@@ -10,3 +10,4 @@ Needs Docker Desktop, k3d, helm, kubectl, make (Git Bash on Windows).
 
     make cluster-up
     make deploy
+    make register   # gives the gateway woo-mcp's token; until then woo shows Unreachable

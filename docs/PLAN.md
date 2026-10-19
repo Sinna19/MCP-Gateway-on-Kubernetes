@@ -105,8 +105,8 @@ In this order:
 - **Accept:** tests for each limit pass (`make test`); 429s shown with curl; `scripts/dod-check.sh` rerun.
 
 ### 7d Upstream and audit fixes
-- [ ] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
-- [ ] woo-mcp requires a bearer token, sent by the gateway as an upstream credential (hop token; was optional, now required)
+- [x] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
+- [x] woo-mcp requires a bearer token, sent by the gateway as an upstream credential (hop token; was optional, now required)
 - [ ] fx-mcp and notes-mcp log one line on 401 (never the key)
 - [ ] Audit: record tool args (size-capped, never secrets) and declined chat confirms as rows
 - **Accept:** regenerated Woo password works without restart; woo-mcp rejects calls without the token; audit shows args and declined confirms; `scripts/dod-check.sh` rerun.
