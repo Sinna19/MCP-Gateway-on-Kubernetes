@@ -98,10 +98,10 @@ In this order:
 - [x] Revoking a key or disabling a user (or changing their role) closes its open MCP sessions/SSE streams (ADR 014)
 - [x] Login rate limiting on `POST /api/auth/login` (per IP + per email, 429)
 - [x] Per-key rate limit on `/mcp` tool calls (429, configurable in values) (stand-out #7)
-- [ ] Per-user daily chat cap (Postgres counter, 429, configurable in values)
-- [ ] `/mcp` session cap per API key; sweep sessions whose `initialize` failed
-- [ ] Periodic expired-session sweep (Postgres sessions table)
-- [ ] Throttle `api_keys.last_used_at` writes (at most once per minute per key)
+- [x] Per-user daily chat cap (Postgres counter, 429, configurable in values)
+- [x] `/mcp` session cap per API key; sweep sessions whose `initialize` failed
+- [x] Periodic expired-session sweep (Postgres sessions table)
+- [x] Throttle `api_keys.last_used_at` writes (at most once per minute per key)
 - **Accept:** tests for each limit pass (`make test`); 429s shown with curl; `scripts/dod-check.sh` rerun.
 
 ### 7d Upstream and audit fixes
