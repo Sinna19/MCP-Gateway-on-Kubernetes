@@ -29,6 +29,7 @@ export interface ApiOptions {
 export interface SessionControl {
   closeKeySessions: (keyHash: string) => void;
   closeUserSessions: (userId: number) => void;
+  notifyToolsChanged: () => void; // a tool rule changed: open sessions should list tools again
 }
 
 // Everything under /api: JSON only, session cookie auth, one error handler at the end.
@@ -43,7 +44,7 @@ export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure,
   router.use(memberRoutes(pool, sessions));
   router.use(keyRoutes(pool, sessions, keyUsage));
   router.use(auditRoutes(pool));
-  router.use(serverRoutes(pool, upstreams, credentialsKey, allowLoopback));
+  router.use(serverRoutes(pool, upstreams, credentialsKey, allowLoopback, sessions.notifyToolsChanged));
   router.use(chatRoutes(chat));
   router.use((_req, res) => void res.status(404).json({ error: "not found" }));
   router.use(apiErrors);

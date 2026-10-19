@@ -2,6 +2,7 @@ import { Router } from "express";
 import type pg from "pg";
 import { z } from "zod";
 import { encrypt } from "../crypto.js";
+import { prefixed } from "../tool-names.js";
 import type { ServerStatus, UpstreamControl, UpstreamStatus } from "../upstreams.js";
 import { isBlockedHost } from "../url-guard.js";
 import { currentUser, requireAdmin, requireUser } from "./middleware.js";
@@ -14,13 +15,29 @@ interface ServerRow {
   credential_enc: string | null;
 }
 
+export interface ToolRule {
+  tool: string; // the upstream's own name, no "<slug>__" prefix
+  adminOnly: boolean;
+}
+
 // The only place a server becomes JSON. It lists fields one by one, so a new column
-// (or the ciphertext) can never leak by accident. Members get no url or header details.
-export function serverView(row: ServerRow, live: Pick<ServerStatus, "status" | "tools"> | undefined, isAdmin: boolean) {
+// (or the ciphertext) can never leak by accident. Members get no url or header details,
+// no admin-only tools and no sign that rules exist.
+export function serverView(row: ServerRow, live: Pick<ServerStatus, "status" | "tools"> | undefined, isAdmin: boolean, rules: ToolRule[] = []) {
   const status: UpstreamStatus = live?.status ?? (row.enabled ? "unreachable" : "disabled");
-  const view = { slug: row.slug, enabled: row.enabled, status, tools: live?.tools ?? [] };
-  if (!isAdmin) return view;
-  return { ...view, url: row.url, headerName: row.header_name, hasCredential: row.credential_enc !== null };
+  const restricted = new Set(rules.filter((r) => r.adminOnly).map((r) => prefixed(row.slug, r.tool)));
+  const tools = live?.tools ?? [];
+  if (!isAdmin) return { slug: row.slug, enabled: row.enabled, status, tools: tools.filter((t) => !restricted.has(t.name)) };
+  return {
+    slug: row.slug,
+    enabled: row.enabled,
+    status,
+    tools: tools.map((t) => ({ ...t, adminOnly: restricted.has(t.name) })),
+    toolRules: rules.map((r) => ({ tool: r.tool, adminOnly: r.adminOnly })),
+    url: row.url,
+    headerName: row.header_name,
+    hasCredential: row.credential_enc !== null,
+  };
 }
 
 // Headers that would break the HTTP request or that have their own auth type.
@@ -88,21 +105,59 @@ function credentialFor(key: Buffer, slug: string, auth: AuthInput): { headerName
 
 const COLUMNS = "slug, url, enabled, header_name, credential_enc";
 
-export function serverRoutes(pool: pg.Pool, upstreams: UpstreamControl, credentialsKey: Buffer, allowLoopback = false): Router {
+const toolRuleBody = z.strictObject({ adminOnly: z.boolean() });
+const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+
+export function serverRoutes(pool: pg.Pool, upstreams: UpstreamControl, credentialsKey: Buffer, allowLoopback = false, onToolRulesChanged: () => void = () => undefined): Router {
   const router = Router();
   const { createBody, patchBody } = bodiesFor(allowLoopback);
+
+  // Every stored rule, grouped by server slug.
+  async function rulesBySlug(): Promise<Map<string, ToolRule[]>> {
+    const { rows } = await pool.query<{ slug: string; tool: string; admin_only: boolean }>(
+      "SELECT s.slug, r.tool, r.admin_only FROM tool_rules r JOIN upstream_servers s ON s.id = r.server_id ORDER BY r.tool",
+    );
+    const bySlug = new Map<string, ToolRule[]>();
+    for (const r of rows) bySlug.set(r.slug, [...(bySlug.get(r.slug) ?? []), { tool: r.tool, adminOnly: r.admin_only }]);
+    return bySlug;
+  }
 
   // One reload after every write: connects new or changed servers, drops removed ones.
   async function viewOf(slug: string, isAdmin: boolean) {
     const { rows } = await pool.query<ServerRow>(`SELECT ${COLUMNS} FROM upstream_servers WHERE slug = $1`, [slug]);
-    return rows[0] && serverView(rows[0], upstreams.statuses().find((s) => s.slug === slug), isAdmin);
+    return rows[0] && serverView(rows[0], upstreams.statuses().find((s) => s.slug === slug), isAdmin, (await rulesBySlug()).get(slug));
   }
 
   router.get("/servers", requireUser, async (_req, res) => {
     const isAdmin = currentUser(res).role === "admin";
     const { rows } = await pool.query<ServerRow>(`SELECT ${COLUMNS} FROM upstream_servers WHERE ($1 OR enabled) ORDER BY slug`, [isAdmin]);
     const live = new Map(upstreams.statuses().map((s) => [s.slug, s]));
-    res.json(rows.map((row) => serverView(row, live.get(row.slug), isAdmin)));
+    const rules = await rulesBySlug();
+    res.json(rows.map((row) => serverView(row, live.get(row.slug), isAdmin, rules.get(row.slug))));
+  });
+
+  // Upsert the rule for one tool. The tool may not be listed right now (an admin can pre-mark it);
+  // `listed` says whether it is. Open /mcp sessions are told to re-read their tool list.
+  router.patch("/servers/:slug/tools/:tool", requireAdmin, async (req, res) => {
+    const slug = String(req.params.slug);
+    const tool = String(req.params.tool);
+    if (!TOOL_NAME.test(tool)) {
+      res.status(400).json({ error: "invalid tool name" });
+      return;
+    }
+    const { adminOnly } = toolRuleBody.parse(req.body);
+    const result = await pool.query(
+      `INSERT INTO tool_rules (server_id, tool, admin_only) SELECT id, $2, $3 FROM upstream_servers WHERE slug = $1
+       ON CONFLICT (server_id, tool) DO UPDATE SET admin_only = EXCLUDED.admin_only`,
+      [slug, tool, adminOnly],
+    );
+    if (!result.rowCount) {
+      res.status(404).json({ error: "server not found" });
+      return;
+    }
+    onToolRulesChanged();
+    const listed = upstreams.statuses().some((s) => s.slug === slug && s.tools.some((t) => t.name === prefixed(slug, tool)));
+    res.json({ tool, adminOnly, listed });
   });
 
   router.post("/servers", requireAdmin, async (req, res) => {

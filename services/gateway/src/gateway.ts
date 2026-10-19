@@ -1,8 +1,8 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { ErrorCode, McpError, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type pg from "pg";
 import type { AuthUser } from "./api-keys.js";
 import { auditArgs } from "./audit-args.js";
-import { splitName } from "./tool-names.js";
+import { prefixed, splitName } from "./tool-names.js";
 import { UpstreamError } from "./upstreams.js";
 
 export type CallSource = "mcp" | "chat";
@@ -14,6 +14,7 @@ export interface ToolBackend {
   callTool(slug: string, tool: string, args: Record<string, unknown> | undefined): Promise<CallToolResult>;
 }
 
+const NOT_PERMITTED = "tool not permitted for your role";
 const MAX_AUDIT_ERROR = 500;
 const MAX_TOOL_NAME = 100; // caller-chosen text: bounded before it is echoed back or stored
 
@@ -28,11 +29,24 @@ export class Gateway {
     private readonly backend: ToolBackend,
   ) {}
 
-  listTools(): Tool[] {
-    return this.backend.tools();
+  // The one permission check (ADR 022): prefixed names ("woo__create_product") this user may not use.
+  // The role is read from the database on every request, so a role change applies to open sessions at once.
+  private async restrictedFor(user: AuthUser): Promise<Set<string>> {
+    const { rows: roles } = await this.pool.query<{ role: string }>("SELECT role FROM users WHERE id = $1 AND disabled_at IS NULL", [user.id]);
+    if (roles[0]?.role === "admin") return new Set();
+    const { rows } = await this.pool.query<{ slug: string; tool: string }>(
+      "SELECT s.slug, r.tool FROM tool_rules r JOIN upstream_servers s ON s.id = r.server_id WHERE r.admin_only",
+    );
+    return new Set(rows.map((r) => prefixed(r.slug, r.tool)));
+  }
+
+  async listTools(user: AuthUser): Promise<Tool[]> {
+    const restricted = await this.restrictedFor(user);
+    return this.backend.tools().filter((t) => !restricted.has(t.name));
   }
 
   // Failures come back as error results (so the caller, often an LLM, can read them), never as exceptions.
+  // The one exception is a tool the user's role may not use: that throws, so /mcp answers with a JSON-RPC error.
   async callTool(user: AuthUser, name: string, args: Record<string, unknown> | undefined, source: CallSource): Promise<CallToolResult> {
     const startedAt = new Date();
     const timer = performance.now();
@@ -41,6 +55,7 @@ export class Gateway {
     let error: string | null = null;
     try {
       if (!parts) throw new UpstreamError(`unknown tool '${name.slice(0, MAX_TOOL_NAME)}'`);
+      if ((await this.restrictedFor(user)).has(name)) throw new McpError(ErrorCode.InvalidParams, NOT_PERMITTED);
       const result = await this.backend.callTool(parts.slug, parts.tool, args);
       if (result.isError) {
         // The upstream's own error text is a result, so it is not copied into the audit log.
@@ -50,6 +65,10 @@ export class Gateway {
       outcome = "ok";
       return result;
     } catch (err) {
+      if (err instanceof McpError) {
+        error = NOT_PERMITTED;
+        throw err;
+      }
       if (err instanceof UpstreamError) {
         error = err.message;
         return errorResult(err.message);

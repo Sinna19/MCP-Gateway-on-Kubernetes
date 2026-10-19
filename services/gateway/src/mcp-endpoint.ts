@@ -58,7 +58,7 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
 
   function newSession(user: AuthUser, keyHash: string): StreamableHTTPServerTransport {
     const server = new Server({ name: "urumi-gateway", version: "0.1.0" }, { capabilities: { tools: { listChanged: true } } });
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: gateway.listTools() }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: await gateway.listTools(user) }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => gateway.callTool(user, request.params.name, request.params.arguments, "mcp"));
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: randomUUID,

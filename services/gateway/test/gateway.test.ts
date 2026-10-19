@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AuthUser } from "../src/api-keys.js";
@@ -24,7 +25,7 @@ describe("Gateway.callTool", () => {
     const { rows } = await pool.query("INSERT INTO users (email, role, password_hash) VALUES ('a@x.io', 'member', 'x') RETURNING id");
     user = { id: rows[0].id, email: "a@x.io", role: "member" };
     backend = {
-      tools: () => [],
+      tools: (): Tool[] => [],
       callTool: async () => ({ content: [{ type: "text", text: "fine" }] }),
     };
     gateway = new Gateway(pool, backend);
@@ -104,6 +105,54 @@ describe("Gateway.callTool", () => {
     it("cuts a long tool name to 100 characters", async () => {
       await gateway.recordDeclined(user, `woo__${"y".repeat(300)}`, {});
       expect((await audit())[0].tool.length).toBe(100);
+    });
+  });
+
+  describe("tool rules", () => {
+    const tool = (name: string) => ({ name, inputSchema: { type: "object" as const } });
+    let admin: AuthUser;
+
+    beforeEach(async () => {
+      const { rows } = await pool.query("INSERT INTO users (email, role, password_hash) VALUES ('boss@x.io', 'admin', 'x') RETURNING id");
+      admin = { id: rows[0].id, email: "boss@x.io", role: "admin" };
+      await pool.query("INSERT INTO upstream_servers (slug, url) VALUES ('woo', 'http://woo')");
+      await pool.query("INSERT INTO tool_rules (server_id, tool, admin_only) SELECT id, 'create_product', true FROM upstream_servers WHERE slug = 'woo'");
+      backend.tools = () => [tool("woo__list_orders"), tool("woo__create_product")];
+    });
+
+    it("a member's tool list leaves out admin-only tools, an admin's does not", async () => {
+      expect((await gateway.listTools(user)).map((t) => t.name)).toEqual(["woo__list_orders"]);
+      expect((await gateway.listTools(admin)).map((t) => t.name)).toEqual(["woo__list_orders", "woo__create_product"]);
+    });
+
+    it("a rule with admin_only false hides nothing", async () => {
+      await pool.query("UPDATE tool_rules SET admin_only = false");
+      expect(await gateway.listTools(user)).toHaveLength(2);
+    });
+
+    it("a member calling an admin-only tool is refused, never reaches the backend, and is audited as an error", async () => {
+      let called = false;
+      backend.callTool = async () => {
+        called = true;
+        return { content: [] };
+      };
+      await expect(gateway.callTool(user, "woo__create_product", { name: "W" }, "mcp")).rejects.toThrow("tool not permitted for your role");
+      expect(called).toBe(false);
+      const rows = await audit();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ user_id: user.id, server_slug: "woo", tool: "create_product", outcome: "error", error: "tool not permitted for your role", source: "mcp" });
+    });
+
+    it("an admin can call it", async () => {
+      const result = await gateway.callTool(admin, "woo__create_product", {}, "mcp");
+      expect(result.isError).toBeFalsy();
+    });
+
+    it("the role is read on every request, not taken from the AuthUser it was given", async () => {
+      await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+      expect((await gateway.callTool(user, "woo__create_product", {}, "mcp")).isError).toBeFalsy();
+      await pool.query("UPDATE users SET role = 'member' WHERE id = $1", [admin.id]);
+      await expect(gateway.callTool(admin, "woo__create_product", {}, "mcp")).rejects.toThrow("not permitted");
     });
   });
 

@@ -1,4 +1,4 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { McpError, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthUser } from "../api-keys.js";
 import type { CallSource } from "../gateway.js";
 import { ChatError, LlmError } from "./errors.js";
@@ -18,7 +18,7 @@ const STOPPED = "This took too long, so I stopped. Ask again to continue.";
 
 // What the agent needs from the Gateway class (the same object /mcp uses).
 export interface ChatGateway {
-  listTools(): Tool[];
+  listTools(user: AuthUser): Promise<Tool[]>;
   callTool(user: AuthUser, name: string, args: Record<string, unknown> | undefined, source: CallSource): Promise<CallToolResult>;
   recordDeclined(user: AuthUser, name: string, args: Record<string, unknown> | undefined): Promise<void>;
 }
@@ -144,7 +144,7 @@ export class ChatAgent {
     for (let step = 0; step < this.maxSteps; step++) {
       const left = deadline - this.now();
       if (left <= 0) return finish(STOPPED, true);
-      const tools = this.options.gateway.listTools();
+      const tools = await this.options.gateway.listTools(user);
       const signal = AbortSignal.any([AbortSignal.timeout(this.llmTimeoutMs), AbortSignal.timeout(left)]);
 
       let assistant: ChatMessage;
@@ -191,7 +191,14 @@ export class ChatAgent {
   private async execute(user: AuthUser, name: string, args: Record<string, unknown>, callId: string, convo: ChatMessage[], views: ToolCallView[], deadline: number): Promise<void> {
     // Checked before every call: a step with several slow calls cannot run past the budget.
     if (this.now() >= deadline) return this.refuse(convo, views, name, callId, args, OUT_OF_TIME);
-    const result = await this.options.gateway.callTool(user, name, args, "chat");
+    let result: CallToolResult;
+    try {
+      result = await this.options.gateway.callTool(user, name, args, "chat");
+    } catch (err) {
+      // The gateway throws only for a tool this user's role may not use; the model reads it like any tool error.
+      if (!(err instanceof McpError)) throw err;
+      result = { isError: true, content: [{ type: "text", text: "tool not permitted for your role" }] };
+    }
     convo.push({ role: "tool", tool_call_id: callId, content: wrapToolResult(name, result) });
     views.push({ tool: name, args, ok: !result.isError, summary: cleanText(resultText(result), SUMMARY_CHARS) });
   }

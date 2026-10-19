@@ -193,6 +193,45 @@ describe("ChatAgent", () => {
     expect(await audit()).toMatchObject([{ user_id: String(user.id), server_slug: "woo", tool: "list_orders", outcome: "ok", source: "chat" }]);
   });
 
+  describe("tool rules (ADR 022)", () => {
+    beforeEach(async () => {
+      await pool.query("INSERT INTO upstream_servers (slug, url) VALUES ('woo', 'http://woo')");
+      await pool.query("INSERT INTO tool_rules (server_id, tool, admin_only) SELECT id, t, true FROM upstream_servers, (VALUES ('create_product'), ('update_order_status')) AS v(t) WHERE slug = 'woo'");
+    });
+
+    it("a member's model is not offered the admin-only tools", async () => {
+      let offered = "";
+      const llm: LlmFn = async (_messages, tools) => {
+        offered = JSON.stringify(tools);
+        return say("hi");
+      };
+      await agent(llm)({ user, messages: [user1] });
+      expect(offered).toContain("woo__list_orders");
+      expect(offered).not.toMatch(/create_product|update_order_status/);
+    });
+
+    it("an admin's model is offered them", async () => {
+      await pool.query("UPDATE users SET role = 'admin'");
+      let offered = "";
+      const llm: LlmFn = async (_messages, tools) => {
+        offered = JSON.stringify(tools);
+        return say("hi");
+      };
+      await agent(llm)({ user, messages: [user1] });
+      expect(offered).toContain("woo__update_order_status");
+    });
+
+    it("if the model calls one anyway, it is refused: no confirm, no upstream call, one error audit row", async () => {
+      const out = await agent(scripted(assistantCalls(toolCall("c1", "woo__update_order_status", { id: 1, status: "completed" })), say("I cannot do that")))({ user, messages: [user1] });
+      expect(out.pendingToolCall).toBeUndefined();
+      expect(calls).toEqual([]);
+      expect(out.toolCalls).toMatchObject([{ tool: "woo__update_order_status", ok: false, summary: expect.stringContaining("not permitted") }]);
+      const rows = await audit();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ tool: "update_order_status", outcome: "error", error: "tool not permitted for your role", source: "chat" });
+    });
+  });
+
   it("stops at maxSteps with a clear reply, not an exception", async () => {
     const loop = () => assistantCalls(toolCall("c", "woo__list_orders", {}));
     const out = await agent(scripted(loop(), loop(), loop(), loop()), { maxSteps: 3 })({ user, messages: [user1] });

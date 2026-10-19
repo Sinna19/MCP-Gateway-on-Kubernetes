@@ -72,6 +72,19 @@ register() {
 }
 
 register woo "http://woo-mcp:3000/mcp" "$(T="$WOO_TOKEN" jq -n '{type:"bearer",token:env.T}')"
+# Members get woo's read tools only (ADR 022). A deleted and re-added woo has lost its rules, so put the
+# defaults back, but only where no rule exists: a rule an admin set (even to false) is never touched.
+for tool in create_product update_order_status; do
+  has_rule="$(list_servers | jq -r --arg t "$tool" '.[] | select(.slug == "woo") | any(.toolRules[]; .tool == $t)' | tr -d '\r')"
+  if [ "$has_rule" = "true" ]; then
+    echo "woo/$tool: rule already set, left as is"
+  else
+    send PATCH "/api/servers/woo/tools/$tool" <<<'{"adminOnly":true}'
+    [ "$code" = "200" ] || { echo "woo/$tool: could not set the admin-only rule (HTTP $code)" >&2; exit 1; }
+    echo "woo/$tool: admin only"
+  fi
+done
+
 register fx "http://fx-mcp:3000/mcp" "$(T="$FX_TOKEN" jq -n '{type:"bearer",token:env.T}')"
 register notes "http://notes-mcp:3000/mcp" "$(V="$NOTES_KEY" jq -n '{type:"header",name:"X-Notes-Key",value:env.V}')"
 

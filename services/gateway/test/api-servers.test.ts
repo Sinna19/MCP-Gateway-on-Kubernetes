@@ -235,4 +235,57 @@ describe("/api servers", () => {
       }
     });
   });
+
+  describe("tool rules", () => {
+    const setRule = (tool: string, body: unknown, cookie = admin, slug = "fake") => call(base, `/servers/${slug}/tools/${tool}`, { method: "PATCH", body, cookie });
+
+    beforeEach(async () => {
+      await create({});
+    });
+
+    it("an admin marks a listed tool admin-only: stored, reported as listed, shown to admins and hidden from members", async () => {
+      const res = await setRule("ping", { adminOnly: true });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ tool: "ping", adminOnly: true, listed: true });
+      const asAdmin = (await call(base, "/servers", { cookie: admin })).body[0];
+      expect(asAdmin.tools).toEqual([{ name: "fake__ping", description: expect.any(String), adminOnly: true }]);
+      expect(asAdmin.toolRules).toEqual([{ tool: "ping", adminOnly: true }]);
+      const asMember = (await call(base, "/servers", { cookie: member })).body[0];
+      expect(asMember.tools).toEqual([]);
+      expect(JSON.stringify(asMember)).not.toMatch(/adminOnly|toolRules/);
+    });
+
+    it("can pre-mark a tool the server does not list; the answer says it is not listed", async () => {
+      const res = await setRule("not_there_yet", { adminOnly: true });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ tool: "not_there_yet", adminOnly: true, listed: false });
+      expect((await call(base, "/servers", { cookie: admin })).body[0].toolRules).toEqual([{ tool: "not_there_yet", adminOnly: true }]);
+    });
+
+    it("false is stored as a rule too (so register-upstreams.sh knows an admin chose it) and hides nothing", async () => {
+      await setRule("ping", { adminOnly: true });
+      await setRule("ping", { adminOnly: false });
+      expect((await call(base, "/servers", { cookie: admin })).body[0].toolRules).toEqual([{ tool: "ping", adminOnly: false }]);
+      expect((await call(base, "/servers", { cookie: member })).body[0].tools).toHaveLength(1);
+    });
+
+    it("a member gets 403, nothing is stored", async () => {
+      expect((await setRule("ping", { adminOnly: true }, member)).status).toBe(403);
+      expect((await pool.query("SELECT 1 FROM tool_rules")).rowCount).toBe(0);
+    });
+
+    it("unknown server 404, bad body 400, bad tool name 400", async () => {
+      expect((await setRule("ping", { adminOnly: true }, admin, "nope")).status).toBe(404);
+      expect((await setRule("ping", { adminOnly: "yes" })).status).toBe(400);
+      expect((await setRule("ping", { adminOnly: true, extra: 1 })).status).toBe(400);
+      expect((await setRule("a".repeat(65), { adminOnly: true })).status).toBe(400);
+      expect((await setRule("bad.name", { adminOnly: true })).status).toBe(400);
+    });
+
+    it("deleting the server deletes its rules", async () => {
+      await setRule("ping", { adminOnly: true });
+      await call(base, "/servers/fake", { method: "DELETE", cookie: admin });
+      expect((await pool.query("SELECT 1 FROM tool_rules")).rowCount).toBe(0);
+    });
+  });
 });

@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { createKey, revokeKey } from "../src/api-keys.js";
 import { createApp, type App } from "../src/app.js";
 import { UpstreamManager } from "../src/upstreams.js";
+import { call, login, makeUser as makeAdmin } from "./api-helpers.js";
 import { FakeUpstream, waitFor } from "./fake-upstream.js";
 import { createTestDb, resetData } from "./helpers.js";
 
@@ -182,6 +183,57 @@ describe("/mcp endpoint", () => {
     expect(notified).toBe(1);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual(["woo__list_orders"]);
+  });
+
+  describe("tool rules (ADR 022)", () => {
+    beforeEach(async () => {
+      woo.addTool("create_product", () => "created");
+      await waitFor(() => manager.tools().some((t) => t.name === "woo__create_product"));
+      await pool.query("INSERT INTO tool_rules (server_id, tool, admin_only) SELECT id, 'create_product', true FROM upstream_servers WHERE slug = 'woo'");
+    });
+
+    it("a member's tools/list has no admin-only tool, an admin's has it", async () => {
+      const { tools } = await (await connect(alice.key)).listTools();
+      expect(tools.map((t) => t.name).sort()).toEqual(["fx__convert", "woo__list_orders"]);
+      await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [alice.id]);
+      const again = await (await connect(alice.key)).listTools();
+      expect(again.tools.map((t) => t.name)).toContain("woo__create_product");
+    });
+
+    it("a member's direct call is a JSON-RPC error and an audit row with outcome error", async () => {
+      const client = await connect(alice.key);
+      await expect(client.callTool({ name: "woo__create_product", arguments: { name: "W" } })).rejects.toThrow("tool not permitted for your role");
+      const { rows } = await pool.query("SELECT * FROM audit_log");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ user_id: alice.id, server_slug: "woo", tool: "create_product", outcome: "error", error: "tool not permitted for your role", source: "mcp" });
+    });
+
+    it("changing a rule through the admin API tells an open member session the list changed", async () => {
+      let gets = 0;
+      let notified = 0;
+      const client = new Client({ name: "test", version: "1" });
+      client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+        notified++;
+      });
+      const transport = new StreamableHTTPClientTransport(new URL(base), {
+        requestInit: { headers: { Authorization: `Bearer ${alice.key}` } },
+        fetch: (input, init) => {
+          if (init?.method === "GET") gets++;
+          return fetch(input, init);
+        },
+      });
+      await client.connect(transport);
+      clients.push(client);
+      await waitFor(() => gets > 0);
+      await new Promise((r) => setTimeout(r, 100)); // the server registers the stream just after the GET arrives
+      await makeAdmin(pool, "boss@x.io", "admin");
+      const origin = base.replace(/\/mcp$/, "");
+      const cookie = await login(origin, "boss@x.io");
+      const res = await call(origin, "/servers/woo/tools/create_product", { method: "PATCH", body: { adminOnly: false }, cookie });
+      expect(res.status).toBe(200);
+      await waitFor(() => notified > 0);
+      expect((await client.listTools()).tools.map((t) => t.name)).toContain("woo__create_product");
+    });
   });
 
   it("DELETE ends the session; the id then returns 404", async () => {

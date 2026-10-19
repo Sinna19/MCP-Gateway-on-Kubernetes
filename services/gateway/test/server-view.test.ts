@@ -14,7 +14,8 @@ describe("serverView", () => {
       slug: "woo",
       enabled: true,
       status: "connected",
-      tools: live.tools,
+      tools: [{ name: "woo__list_products", description: "List products", adminOnly: false }],
+      toolRules: [],
       url: "http://woo-mcp:8080/mcp",
       headerName: "X-Api-Key",
       hasCredential: true,
@@ -35,6 +36,26 @@ describe("serverView", () => {
   it("reports hasCredential false when none is stored", () => {
     const view = serverView({ ...row, header_name: null, credential_enc: null }, live, true);
     expect(view).toMatchObject({ headerName: null, hasCredential: false });
+  });
+
+  describe("tool rules", () => {
+    const two = { status: "connected" as const, tools: [{ name: "woo__list_orders", description: "L" }, { name: "woo__create_product", description: "C" }] };
+    const rules = [{ tool: "create_product", adminOnly: true }, { tool: "renamed_away", adminOnly: true }];
+
+    it("hides admin-only tools from members and shows no rules or flags", () => {
+      const view = serverView(row, two, false, rules);
+      expect(view.tools).toEqual([{ name: "woo__list_orders", description: "L" }]);
+      expect(JSON.stringify(view)).not.toMatch(/adminOnly|toolRules/);
+    });
+
+    it("gives admins every tool with its flag, plus all stored rules (also for tools not listed)", () => {
+      const view = serverView(row, two, true, rules) as unknown as { tools: unknown[]; toolRules: unknown[] };
+      expect(view.tools).toEqual([
+        { name: "woo__list_orders", description: "L", adminOnly: false },
+        { name: "woo__create_product", description: "C", adminOnly: true },
+      ]);
+      expect(view.toolRules).toEqual(rules);
+    });
   });
 
   it("falls back to disabled / unreachable with no tools when the manager has no entry yet", () => {
