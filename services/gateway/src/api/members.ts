@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { deleteUserSessions } from "../sessions.js";
 import { currentUser, idParam, requireAdmin } from "./middleware.js";
+import type { SessionControl } from "./router.js";
 
 const patchBody = z
   .object({ role: z.enum(["admin", "member"]).optional(), disabled: z.boolean().optional() })
@@ -19,7 +20,7 @@ async function selectMembers(pool: pg.Pool, id?: number) {
   return rows.map((r) => ({ id: r.id, email: r.email, role: r.role, disabled: r.disabled, createdAt: r.created_at, activeKeys: r.active_keys }));
 }
 
-export function memberRoutes(pool: pg.Pool): Router {
+export function memberRoutes(pool: pg.Pool, sessions: SessionControl): Router {
   const router = Router();
 
   router.get("/members", requireAdmin, async (_req, res) => {
@@ -40,6 +41,7 @@ export function memberRoutes(pool: pg.Pool): Router {
     // (same as bootstrap) makes the "is there another enabled admin?" check and the update one step.
     const client = await pool.connect();
     let outcome: "ok" | "missing" | "last-admin" = "ok";
+    let roleChanged = false;
     try {
       await client.query("BEGIN");
       await client.query("LOCK TABLE users IN EXCLUSIVE MODE");
@@ -52,6 +54,7 @@ export function memberRoutes(pool: pg.Pool): Router {
         if (others && !others.rowCount) {
           outcome = "last-admin";
         } else {
+          roleChanged = role !== undefined && role !== target.rows[0].role;
           await client.query(
             `UPDATE users SET role = COALESCE($2, role),
                     disabled_at = CASE WHEN $3::boolean IS NULL THEN disabled_at WHEN $3 THEN COALESCE(disabled_at, now()) ELSE NULL END
@@ -76,6 +79,8 @@ export function memberRoutes(pool: pg.Pool): Router {
       return;
     }
     if (disabled === true) await deleteUserSessions(pool, id);
+    // Disabled, or a different role than before: end open /mcp sessions so none keeps the old access.
+    if (disabled === true || roleChanged) sessions.closeUserSessions(id);
     res.json((await selectMembers(pool, id))[0]);
   });
 

@@ -3,11 +3,12 @@ import type pg from "pg";
 import { z } from "zod";
 import { createKey, revokeKey } from "../api-keys.js";
 import { currentUser, idParam, requireUser } from "./middleware.js";
+import type { SessionControl } from "./router.js";
 
 const createBody = z.strictObject({ name: z.string().trim().min(1).max(100) });
 const listQuery = z.object({ all: z.enum(["true", "false"]).optional() });
 
-export function keyRoutes(pool: pg.Pool): Router {
+export function keyRoutes(pool: pg.Pool, sessions: SessionControl): Router {
   const router = Router();
 
   // Lists the prefix only; the hash and the full key are never selected.
@@ -40,12 +41,13 @@ export function keyRoutes(pool: pg.Pool): Router {
   router.delete("/keys/:id", requireUser, async (req, res) => {
     const id = idParam(req.params.id);
     const user = currentUser(res);
-    const { rowCount } = await pool.query("SELECT 1 FROM api_keys WHERE id = $1 AND ($2::boolean OR user_id = $3)", [id, user.role === "admin", user.id]);
-    if (!rowCount) {
+    const { rows } = await pool.query("SELECT hash FROM api_keys WHERE id = $1 AND ($2::boolean OR user_id = $3)", [id, user.role === "admin", user.id]);
+    if (!rows[0]) {
       res.status(404).json({ error: "key not found" });
       return;
     }
     await revokeKey(pool, id);
+    sessions.closeKeySessions(rows[0].hash); // ends open /mcp sessions and SSE streams opened with this key
     res.status(204).end();
   });
 

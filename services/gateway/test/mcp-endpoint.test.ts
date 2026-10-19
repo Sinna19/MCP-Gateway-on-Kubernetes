@@ -58,7 +58,7 @@ describe("/mcp endpoint", () => {
     const credentialsKey = randomBytes(32);
     manager = new UpstreamManager({ pool, credentialsKey, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300, allowLoopback: true });
     await manager.reload();
-    app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000 });
+    app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000, limits: { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 3 } });
     http = await new Promise<Server>((resolve) => {
       const s = app.express.listen(0, "127.0.0.1", () => resolve(s));
     });
@@ -204,6 +204,47 @@ describe("/mcp endpoint", () => {
     app.sweep();
     expect(app.sessionCount()).toBe(0);
     expect((await listRequest(alice.key, sessionId)).status).toBe(404);
+  });
+
+  const callRequest = (key: string, sessionId: string, name = "fx__does_not_exist") =>
+    fetch(base, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}`, "mcp-session-id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name, arguments: {} } }),
+    }).then(async (res) => {
+      await res.text();
+      return res;
+    });
+
+  it("limits tools/call per key (3 per minute in this suite): 429 with Retry-After and a JSON-RPC error", async () => {
+    const sessionId = await rawInitialize(alice.key);
+    // An unknown tool still counts: the limit runs before any tool lookup.
+    for (let i = 0; i < 3; i++) expect((await callRequest(alice.key, sessionId)).status).toBe(200);
+    const res = await fetch(base, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, Authorization: `Bearer ${alice.key}`, "mcp-session-id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "fx__does_not_exist", arguments: {} } }),
+    });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(await res.json()).toMatchObject({ jsonrpc: "2.0", id: 4, error: { code: -32000, message: expect.stringContaining("rate limit") } });
+  });
+
+  it("does not count tools/list, and one key's limit does not touch another key", async () => {
+    const a = await rawInitialize(alice.key);
+    const b = await rawInitialize(bob.key);
+    for (let i = 0; i < 6; i++) expect((await listRequest(alice.key, a)).status).toBe(200);
+    for (let i = 0; i < 3; i++) await callRequest(alice.key, a);
+    expect((await callRequest(alice.key, a)).status).toBe(429);
+    expect((await callRequest(bob.key, b)).status).toBe(200);
+  });
+
+  it("allows calls again when the minute is over", async () => {
+    const sessionId = await rawInitialize(alice.key);
+    for (let i = 0; i < 3; i++) await callRequest(alice.key, sessionId);
+    expect((await callRequest(alice.key, sessionId)).status).toBe(429);
+    clock += 60_000;
+    expect((await callRequest(alice.key, sessionId)).status).toBe(200);
   });
 
   it("a session can only be used with the key that opened it", async () => {

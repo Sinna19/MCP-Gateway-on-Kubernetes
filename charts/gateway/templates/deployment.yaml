@@ -101,6 +101,14 @@ spec:
                   optional: true
             - name: CHAT_READ_ONLY_TOOLS
               value: {{ join "," .Values.chat.readOnlyTools | quote }}
+            - name: LOGIN_LIMIT_PER_EMAIL
+              value: {{ .Values.limits.login.perEmail | quote }}
+            - name: LOGIN_LIMIT_PER_IP
+              value: {{ .Values.limits.login.perIp | quote }}
+            - name: LOGIN_LIMIT_WINDOW_SECONDS
+              value: {{ .Values.limits.login.windowSeconds | quote }}
+            - name: MCP_CALLS_PER_MINUTE
+              value: {{ .Values.limits.mcp.callsPerMinute | quote }}
           # Room for migrate() and bootstrap on first start (up to 60s) before liveness takes over.
           startupProbe:
             httpGet:

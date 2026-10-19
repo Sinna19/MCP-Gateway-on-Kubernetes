@@ -1,3 +1,5 @@
+import { DEFAULT_LIMITS, type Limits } from "./rate-limit.js";
+
 export interface Config {
   databaseUrl: string;
   credentialsKey: Buffer;
@@ -10,6 +12,7 @@ export interface Config {
   cookieSecure: boolean;
   llm?: { baseUrl: string; model: string; apiKey: string }; // unset = chat answers 503
   chatReadOnlyTools: Set<string>;
+  limits: Limits;
 }
 
 const REQUIRED = ["DATABASE_URL", "CREDENTIALS_KEY", "ADMIN_EMAIL", "ADMIN_PASSWORD", "SEED_WOO_URL"];
@@ -31,7 +34,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cookieSecure: env.COOKIE_SECURE === "true",
     llm: loadLlm(env),
     chatReadOnlyTools: new Set((env.CHAT_READ_ONLY_TOOLS ?? "").split(",").map((t) => t.trim()).filter(Boolean)),
+    limits: {
+      loginPerEmail: positiveInt(env, "LOGIN_LIMIT_PER_EMAIL", DEFAULT_LIMITS.loginPerEmail),
+      loginPerIp: positiveInt(env, "LOGIN_LIMIT_PER_IP", DEFAULT_LIMITS.loginPerIp),
+      loginWindowMs: positiveInt(env, "LOGIN_LIMIT_WINDOW_SECONDS", DEFAULT_LIMITS.loginWindowMs / 1000) * 1000,
+      mcpCallsPerMinute: positiveInt(env, "MCP_CALLS_PER_MINUTE", DEFAULT_LIMITS.mcpCallsPerMinute),
+    },
   };
+}
+
+// The chart renders empty strings for unset values, so empty means default. A typo fails at start, not at the first request.
+function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) throw new Error(`${name} must be a positive whole number`);
+  return n;
 }
 
 // The chart renders empty strings when chat is not set up, so empty counts as unset.

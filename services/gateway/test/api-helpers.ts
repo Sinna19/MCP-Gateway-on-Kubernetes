@@ -36,7 +36,7 @@ export interface TestServer {
   stop: () => Promise<void>;
 }
 
-export async function startServer(pool: pg.Pool, upstreams: AppOptions["upstreams"] = emptyUpstreams(), extra: Pick<AppOptions, "allowLoopback" | "llm" | "chatReadOnlyTools"> = {}): Promise<TestServer> {
+export async function startServer(pool: pg.Pool, upstreams: AppOptions["upstreams"] = emptyUpstreams(), extra: Pick<AppOptions, "allowLoopback" | "llm" | "chatReadOnlyTools" | "limits" | "now"> = {}): Promise<TestServer> {
   const app = createApp({ pool, upstreams, credentialsKey: CREDENTIALS_KEY, ...extra });
   const http = await new Promise<Server>((resolve) => {
     const s = app.express.listen(0, "127.0.0.1", () => resolve(s));
@@ -56,9 +56,11 @@ export interface ApiResponse {
   status: number;
   body: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   setCookie: string | undefined;
+  headers: Headers;
 }
 
 export interface Call {
+  headers?: Record<string, string>; // extra request headers, e.g. X-Forwarded-For
   method?: string;
   body?: unknown;
   cookie?: string; // the session token, without the cookie name
@@ -66,7 +68,7 @@ export interface Call {
 }
 
 export async function call(base: string, path: string, options: Call = {}): Promise<ApiResponse> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   const contentType = options.contentType === undefined ? "application/json" : options.contentType;
   if (contentType) headers["Content-Type"] = contentType;
   if (options.cookie) headers.Cookie = `urumi_session=${options.cookie}`;
@@ -77,7 +79,7 @@ export async function call(base: string, path: string, options: Call = {}): Prom
     body: options.body === undefined ? undefined : typeof options.body === "string" ? options.body : JSON.stringify(options.body),
   });
   const text = await res.text();
-  return { status: res.status, body: text ? JSON.parse(text) : undefined, setCookie: res.headers.getSetCookie().find((c) => c.startsWith("urumi_session=")) };
+  return { status: res.status, body: text ? JSON.parse(text) : undefined, setCookie: res.headers.getSetCookie().find((c) => c.startsWith("urumi_session=")), headers: res.headers };
 }
 
 export function tokenOf(setCookie: string | undefined): string {

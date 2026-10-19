@@ -34,6 +34,16 @@ chat:
     - notes__list_notes
     - notes__list_products
 
+# Rate limits (ADR 020). In memory, so per pod: right for one replica, reset on restart. Over the limit gives 429 + Retry-After.
+# mcp.callsPerMinute must stay well above scripts/dod-check.sh (12 calls on its busiest key).
+limits:
+  login:
+    perEmail: 5 # attempts per email per window, wrong or right
+    perIp: 30 # per client IP; successful logins give theirs back
+    windowSeconds: 900
+  mcp:
+    callsPerMinute: 60 # tools/call per API key
+
 # First upstream registered on first start (in-cluster woo-mcp Service).
 seedWooUrl: http://woo-mcp:3000/mcp
 

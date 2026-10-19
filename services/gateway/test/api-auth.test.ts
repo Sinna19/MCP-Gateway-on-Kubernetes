@@ -99,3 +99,82 @@ describe("/api auth", () => {
     expect(res.body).toEqual({ error: "bad request" });
   });
 });
+
+describe("/api login rate limit", () => {
+  let pool: pg.Pool;
+  let drop: () => Promise<void>;
+  let server: TestServer;
+  let base: string;
+
+  beforeAll(async () => {
+    ({ pool, drop } = await createTestDb());
+  });
+  afterAll(async () => {
+    await drop();
+  });
+  beforeEach(async () => {
+    await resetData(pool);
+    await makeUser(pool, "alice@x.io", "admin");
+  });
+  afterEach(async () => {
+    await server.stop();
+  });
+
+  async function start(loginPerEmail: number, loginPerIp: number): Promise<void> {
+    server = await startServer(pool, undefined, { limits: { loginPerEmail, loginPerIp, loginWindowMs: 900_000, mcpCallsPerMinute: 60 } });
+    base = server.base;
+  }
+  const attempt = (email: string, password = WRONG_PASSWORD, headers?: Record<string, string>) => call(base, "/auth/login", { body: { email, password }, headers });
+
+  it("answers 429 with Retry-After on the attempt after the per-email limit", async () => {
+    await start(5, 100);
+    for (let i = 0; i < 5; i++) expect((await attempt("alice@x.io")).status).toBe(401);
+    const blocked = await attempt("alice@x.io");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(blocked.body).toEqual({ error: "too many login attempts, try again later" });
+    // Locked out means locked out: even the right password is refused until the window ends.
+    expect((await attempt("alice@x.io", PASSWORD)).status).toBe(429);
+  });
+
+  it("counts Admin@X and admin@x (and surrounding spaces) in one bucket", async () => {
+    await start(3, 100);
+    for (const email of ["alice@x.io", "ALICE@X.IO", " Alice@x.io "]) expect((await attempt(email)).status).toBe(401);
+    expect((await attempt("alice@x.io")).status).toBe(429);
+  });
+
+  it("counts an unknown email too, so the limit does not reveal which emails exist", async () => {
+    await start(2, 100);
+    await attempt("nobody@x.io");
+    await attempt("nobody@x.io");
+    expect((await attempt("nobody@x.io")).status).toBe(429);
+  });
+
+  it("a successful login resets the email bucket", async () => {
+    await start(5, 100);
+    for (let i = 0; i < 4; i++) await attempt("alice@x.io");
+    expect((await attempt("alice@x.io", PASSWORD)).status).toBe(200);
+    for (let i = 0; i < 5; i++) expect((await attempt("alice@x.io")).status).toBe(401);
+    expect((await attempt("alice@x.io")).status).toBe(429);
+  });
+
+  it("answers 429 once one IP has used its limit across different emails", async () => {
+    await start(100, 3);
+    for (let i = 0; i < 3; i++) expect((await attempt(`user${i}@x.io`)).status).toBe(401);
+    const blocked = await attempt("user9@x.io");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toMatch(/^\d+$/);
+  });
+
+  it("successful logins give their IP token back, so many good logins never hit the IP limit", async () => {
+    await start(100, 30);
+    for (let i = 0; i < 40; i++) expect((await attempt("alice@x.io", PASSWORD)).status).toBe(200);
+  }, 60_000);
+
+  it("keys the IP bucket on X-Forwarded-For (trust proxy 1: the last hop is Traefik's)", async () => {
+    await start(100, 2);
+    for (let i = 0; i < 2; i++) await attempt("a@x.io", WRONG_PASSWORD, { "X-Forwarded-For": "10.1.1.1" });
+    expect((await attempt("a@x.io", WRONG_PASSWORD, { "X-Forwarded-For": "10.1.1.1" })).status).toBe(429);
+    expect((await attempt("a@x.io", WRONG_PASSWORD, { "X-Forwarded-For": "10.2.2.2" })).status).toBe(401);
+  });
+});

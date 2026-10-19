@@ -6,11 +6,13 @@ import { Router, type Request, type RequestHandler, type Response } from "expres
 import type pg from "pg";
 import { findUserByKey, hashKey, type AuthUser } from "./api-keys.js";
 import type { Gateway } from "./gateway.js";
+import { FixedWindowLimiter } from "./rate-limit.js";
 
 interface Session {
   server: Server;
   transport: StreamableHTTPServerTransport;
   keyHash: string;
+  userId: number;
   lastActive: number;
 }
 
@@ -19,10 +21,17 @@ export interface McpEndpointOptions {
   gateway: Gateway;
   idleMs: number;
   now: () => number;
+  callsPerMinute: number; // tools/call per API key
 }
 
-function rpcError(res: Response, status: number, code: number, message: string): void {
-  res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
+function rpcError(res: Response, status: number, code: number, message: string, id: unknown = null): void {
+  res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id });
+}
+
+// A POST body is one JSON-RPC message or a batch of them. Only tools/call is limited.
+function toolCallsIn(body: unknown): number {
+  const messages: unknown[] = Array.isArray(body) ? body : [body];
+  return messages.filter((m) => (m as { method?: unknown } | null)?.method === "tools/call").length;
 }
 
 // The aggregated MCP endpoint. Stateful: one MCP Server per session so we can push tools/list_changed.
@@ -30,6 +39,8 @@ function rpcError(res: Response, status: number, code: number, message: string):
 export function createMcpEndpoint(options: McpEndpointOptions) {
   const { pool, gateway, idleMs, now } = options;
   const sessions = new Map<string, Session>();
+  // In memory, so per process: fine with one replica, resets on restart (ADR 020).
+  const callLimiter = new FixedWindowLimiter(options.callsPerMinute, 60_000, now);
 
   function closeSession(id: string): void {
     const session = sessions.get(id);
@@ -45,7 +56,7 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: randomUUID,
       onsessioninitialized: (id: string) => {
-        sessions.set(id, { server, transport, keyHash, lastActive: now() });
+        sessions.set(id, { server, transport, keyHash, userId: Number(user.id), lastActive: now() });
       },
     });
     transport.onclose = () => {
@@ -77,6 +88,15 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
       const session = sessions.get(sessionId);
       // A session of someone else's key looks the same as one that does not exist.
       if (!session || session.keyHash !== keyHash) return rpcError(res, 404, -32001, "Session not found");
+      // Counted before any tool lookup or audit, so even calls to unknown tools use up the key's budget.
+      for (let i = 0; i < toolCallsIn(req.body); i++) {
+        const taken = callLimiter.take(keyHash);
+        if (!taken.ok) {
+          res.setHeader("Retry-After", String(taken.retryAfterSeconds));
+          const id = (req.body as { id?: unknown } | null)?.id;
+          return rpcError(res, 429, -32000, `rate limit exceeded, retry in ${taken.retryAfterSeconds}s`, Array.isArray(req.body) ? null : id ?? null);
+        }
+      }
       session.lastActive = now();
       await session.transport.handleRequest(req, res, req.body);
       return;
@@ -109,6 +129,15 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
     },
     sweep: () => {
       for (const [id, session] of sessions) if (now() - session.lastActive > idleMs) closeSession(id);
+      callLimiter.sweep();
+    },
+    // Called by the dashboard API when a key is revoked, a user is disabled or a role changes:
+    // close() ends the session and every open SSE stream, so no more list_changed reaches that client.
+    closeKeySessions: (keyHash: string) => {
+      for (const [id, session] of sessions) if (session.keyHash === keyHash) closeSession(id);
+    },
+    closeUserSessions: (userId: number) => {
+      for (const [id, session] of sessions) if (session.userId === userId) closeSession(id);
     },
     closeAll: () => {
       for (const id of [...sessions.keys()]) closeSession(id);

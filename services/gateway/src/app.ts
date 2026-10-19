@@ -6,6 +6,7 @@ import type { LlmFn } from "./chat/types.js";
 import { Gateway, type ToolBackend } from "./gateway.js";
 import { createApiRouter } from "./api/router.js";
 import { createMcpEndpoint } from "./mcp-endpoint.js";
+import { DEFAULT_LIMITS, FixedWindowLimiter, type Limits } from "./rate-limit.js";
 import type { UpstreamControl } from "./upstreams.js";
 
 export interface AppOptions {
@@ -18,6 +19,7 @@ export interface AppOptions {
   allowLoopback?: boolean; // tests only: lets /api/servers accept 127.0.0.1 upstream URLs
   llm?: LlmFn; // unset = /api/chat answers 503
   chatReadOnlyTools?: Set<string>; // tools chat may run without a confirm; empty = confirm everything
+  limits?: Limits; // rate limits; DEFAULT_LIMITS when unset
 }
 
 export interface App {
@@ -40,11 +42,17 @@ export function createApp(options: AppOptions): App {
   const gateway = new Gateway(pool, upstreams);
   // One agent for the whole app, so the in-flight set and the pending confirms are shared by all requests.
   const chat = options.llm ? new ChatAgent({ gateway, llm: options.llm, readOnlyTools: options.chatReadOnlyTools ?? new Set(), pending: new PendingStore() }) : null;
-  const mcp = createMcpEndpoint({ pool, gateway, idleMs: options.idleMs ?? 30 * 60_000, now: options.now ?? Date.now });
+  const now = options.now ?? Date.now;
+  const limits = options.limits ?? DEFAULT_LIMITS;
+  const mcp = createMcpEndpoint({ pool, gateway, idleMs: options.idleMs ?? 30 * 60_000, now, callsPerMinute: limits.mcpCallsPerMinute });
   upstreams.on("toolsChanged", mcp.notifyToolsChanged);
+  const login = { ip: new FixedWindowLimiter(limits.loginPerIp, limits.loginWindowMs, now), email: new FixedWindowLimiter(limits.loginPerEmail, limits.loginWindowMs, now) };
 
   const app = express();
   app.disable("x-powered-by");
+  // One proxy (Traefik) sits in front: req.ip is the client address it appended to X-Forwarded-For. Traefik
+  // overwrites a client-sent value and the NetworkPolicy lets only Traefik reach us (ADR 019, 020).
+  app.set("trust proxy", 1);
   app.get("/healthz", (_req, res) => void res.send("ok"));
   app.get("/readyz", (_req, res) => {
     pool.query("SELECT 1").then(
@@ -53,8 +61,13 @@ export function createApp(options: AppOptions): App {
     );
   });
   app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
-  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback, chat }));
+  app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback, chat, login, sessions: mcp }));
   app.use(jsonErrors);
 
-  return { express: app, gateway, sessionCount: mcp.sessionCount, sweep: mcp.sweep, closeSessions: mcp.closeAll };
+  const sweep = () => {
+    mcp.sweep();
+    login.ip.sweep();
+    login.email.sweep();
+  };
+  return { express: app, gateway, sessionCount: mcp.sessionCount, sweep, closeSessions: mcp.closeAll };
 }

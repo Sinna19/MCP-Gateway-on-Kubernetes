@@ -17,6 +17,7 @@ upstreams.start();
 const app = createApp({ pool, upstreams, credentialsKey: config.credentialsKey, cookieSecure: config.cookieSecure,
   llm: config.llm ? createLlm(config.llm) : undefined,
   chatReadOnlyTools: config.chatReadOnlyTools,
+  limits: config.limits,
 });
 console.log(config.llm ? `chat enabled (model ${config.llm.model})` : "chat not configured (no LLM_* env)");
 const server = app.express.listen(config.port, () => console.log(`gateway listening on :${config.port}`));
