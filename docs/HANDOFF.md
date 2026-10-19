@@ -1,14 +1,16 @@
 # Handoff
 - **Done this session:**
-  - 0e1e098 chore(gateway): removed the unused `no-control-regex` disable in `services/gateway/src/chat/prompt.ts` (cleanText). `make lint` and `make test` ok, so the lint run is clean.
-  - e2c627a docs(explain): `docs/explain/chat-agent.md` (flow, limits, untrusted tools, confirm/pending, history limit, chart/Secret, Chat page, logout 415, 10 questions, weak points). Line refs match the code after the lint fix.
-  - Tag `phase-6` now points at e2c627a (moved from a24c601 on Ash's say-so).
-  - Quiz on the chat agent: 3 questions sent (confirm args, injection layers, client history). Ash has not answered yet.
+  - 1bed8cf feat(scripts): `scripts/dod-check.sh` (8 checks a-h: tools-all-enabled, calls-ok, audit-per-user, disable-hides-tools, register-keeps-disabled, dead-upstream-isolated, revoke-rejects, user-disable-rejects). PLAN 7a ticked.
+  - Two clean `make dod` runs on the cluster: 8 passed, 0 failed each. Post-run: notes replicas 1, fx/notes/woo enabled + connected, member B enabled with 0 active keys.
+  - A run makes 19 MCP requests, 12 on the busiest key (B's first). 7c's per-key rate limit default must stay above that.
+  - Quiz on the chat agent from the earlier session is still unanswered by Ash.
 - **In progress:** nothing.
-- **Next step:** `7 dod-check script`
+- **Next step:** `7 7b NetworkPolicies`
 - **Gotchas learned:**
-  - `sed -n A,B file | cat -n` numbers from 1, not from A. Add A-1 before quoting a line number, or use `grep -n`.
-  - Edit a line by pattern (`sed -i '17{/pattern/d}'`), not by number alone; a wrong delete broke `prompt.ts` once (restored with `git checkout`).
-  - `make lint && make test` takes over 2 min; run it with `run_in_background` and wait for the notification.
-  - Parked for phase 7: audit `args` column and `declined` rows (ADR 018). Weak points listed in `docs/explain/chat-agent.md` section 14 (no per-user rate cap over time, no gateway egress policy, per-member tool permissions to check).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 7), `docs/REQUIREMENTS.md`, `Makefile`, `scripts/register-upstreams.sh`, `scripts/dod-check.sh` (if it exists).
+  - Docker Desktop must be running before any kubectl/k3d command; after a restart run `k3d cluster start urumi`.
+  - dod-check uses a fixed member `dod-member@example.com` (password in Secret `dod-member`, created on first run). Do not delete that Secret without also disabling the member; the login would no longer match.
+  - dod-check scales notes-mcp to 0 and disables fx while it runs; the EXIT trap restores both. If a run is killed hard (SIGKILL), check `kubectl -n urumi get deploy notes-mcp` and fx in the dashboard.
+  - Env knobs: `DOD_CONTEXT` (k3d-urumi), `DOD_WAIT` (60s), `NS`, `GATEWAY_URL`.
+  - Parked: audit `args` column and `declined` rows (7d); weak points in `docs/explain/chat-agent.md` section 14.
+  - `make lint && make test` takes over 2 min; run with `run_in_background`.
+- **Files the next task needs:** `docs/PLAN.md` (7b section), `.claude/rules/kubernetes.md`, `charts/` NetworkPolicy templates (grep `kind: NetworkPolicy`), `deploy/values-local.yaml`, `scripts/dod-check.sh` (rerun only).
