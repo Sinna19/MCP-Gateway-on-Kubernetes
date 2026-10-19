@@ -1,20 +1,16 @@
 # Handoff
-- **Done this session (7d part 2, code only):**
-  - ff53978 feat(upstreams): fx and notes log `rejected POST /mcp: missing or wrong bearer token` / `... x-notes-key header` on a 401 (no value). Tests spy `console.warn`.
-  - f0966da feat(gateway): migration `005_audit_args.sql` (nullable `args jsonb`, outcome check adds `declined`); `src/audit-args.ts` (`redact`, `auditArgs`, 2 KB cap gives `{_truncated:true,bytes}`); `Gateway.audit` is the one writer, `Gateway.recordDeclined` for chat declines (called in `chat/agent.ts` decline branch with the server-held args); `/api/audit` returns `args` and accepts `outcome=declined`.
-  - 8d1ce87 feat(dashboard): Args column (`<details>` closed, `<pre>` text), `declined` filter option.
-  - 215e8e8 docs: ADR 015 section "Args and declined confirms" (author/keyword/order_key over-redaction kept on purpose, customer data in args, admins see all, members their own incl. args), gateway rule line. 7d boxes ticked in PLAN with "cluster check pending".
-  - `make lint` and `make test` green. Cluster NOT touched this session.
-- **In progress:** nothing.
-- **Next step: verify session for 7d part 2** (`/verify` or by hand): `make images && make deploy` (migration 005 runs on gateway start), then with the admin cookie via curl:
-  1. MCP: call `fx__convert_currency` through `/mcp` (umk key) with an extra `token` field, then `GET /api/audit?limit=1` shows args with `"token":"[redacted]"`. fx may reject the extra field by schema: then the row is outcome `error` but must still carry the redacted args. Report which outcome came back.
-  2. Chat: `POST /api/chat` asking for a write, then `{confirm:{id,approve:false}}`; `GET /api/audit?outcome=declined&limit=1` shows source `chat` with args; woo-mcp log shows no call.
-  3. 401 lines: unauthenticated POST to fx-mcp and notes-mcp from the gateway pod (node fetch via `kubectl exec`), then `kubectl logs deploy/<name> --tail=5 | grep rejected`.
-  4. `make dod` 8/8. If all pass, remove the "cluster check pending" notes in PLAN 7d and tick Accept.
+- **Done this session (7d part 2 verify, no code changes):**
+  - `make images && make deploy`: migration 005 ran (`\d audit_log` shows `args jsonb`, outcome check includes `declined`).
+  - MCP `fx__convert_currency` with extra `token` field: outcome `ok`, audit args show `"token":"[redacted]"`.
+  - Chat write request then decline: `/api/audit?outcome=declined&limit=1` shows source `chat` + args; woo-mcp log has 0 create_product lines.
+  - Unauthenticated POST from gateway pod: fx-mcp and notes-mcp each 401 with one `rejected ...` line, no secret.
+  - Gateway restarted, `make dod` 8/8.
+  - 8d87cd8 docs(plan): 7d part 2 verified on cluster (removed "cluster check pending").
+- **In progress:** nothing. Not done: check 4, the dashboard Audit page in a browser (no browser tool available to me). Needs a manual look: Args `<details>` collapsed, declined filter works. Noted in `docs/PLAN.md:111`.
+- **Next step:** `7e` (see PLAN 7e). First eyeball the Audit page by hand and delete the note at PLAN.md:111.
 - **Gotchas learned:**
-  - The secret-guard hook blocks test literals like `token: "some-long-value"` (12+ chars): generate with `randomBytes` (as in `gateway.test.ts`).
-  - Passing `JSON.stringify(null)` to a jsonb param stores JSON null, not SQL NULL; `Gateway.audit` passes a real `null` for no args.
-  - Old tests asserted "args never stored" (`gateway.test.ts`, `mcp-endpoint.test.ts`); both rewritten for the new behaviour.
-  - `make lint && make test` is slow; background it and wait for the completion notification.
+  - A throwaway verify script that reuses the `scripts/dod-check.sh` helpers (api/login/new_key/mcp_*) works well: extract with `sed -n '/^api() {/,/^# ---- wait loop/p'`, not fixed line numbers (cut a function in half once).
+  - Chat body is `{messages:[{role,content}]}`; the decline is the same `messages` plus `confirm:{id,approve:false}`; pending id is in `pendingToolCall.id`.
+  - fx/notes services listen on port 3000.
   - Parked: weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
-- **Files the next task needs:** `docs/PLAN.md` (7d accept, then 7e), `scripts/dod-check.sh`, `.claude/rules/gateway.md`.
+- **Files the next task needs:** `docs/PLAN.md` (7e), `.claude/rules/gateway.md`, `scripts/dod-check.sh`.
