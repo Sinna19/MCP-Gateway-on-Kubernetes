@@ -20,6 +20,7 @@ const STOPPED = "This took too long, so I stopped. Ask again to continue.";
 export interface ChatGateway {
   listTools(): Tool[];
   callTool(user: AuthUser, name: string, args: Record<string, unknown> | undefined, source: CallSource): Promise<CallToolResult>;
+  recordDeclined(user: AuthUser, name: string, args: Record<string, unknown> | undefined): Promise<void>;
 }
 
 export interface AgentOptions {
@@ -124,6 +125,7 @@ export class ChatAgent {
       if (confirm.approve) {
         await this.execute(user, entry.tool, entry.args, entry.toolCallId, convo, toolCalls, deadline);
       } else {
+        await this.options.gateway.recordDeclined(user, entry.tool, entry.args);
         convo.push({ role: "tool", tool_call_id: entry.toolCallId, content: "user declined" });
         toolCalls.push({ tool: entry.tool, args: entry.args, ok: false, summary: "declined by the user" });
       }

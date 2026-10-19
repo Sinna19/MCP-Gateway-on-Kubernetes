@@ -165,6 +165,21 @@ describe("/api keys and audit", () => {
       expect((await call(base, "/audit?source=chat", { cookie: member })).body).toHaveLength(1);
     });
 
+    it("returns args (null for old rows) and accepts the declined outcome filter", async () => {
+      await pool.query(
+        `INSERT INTO audit_log (user_id, server_slug, tool, started_at, duration_ms, outcome, source, args)
+         VALUES ($1, 'woo', 'create_product', now(), 0, 'declined', 'chat', $2)`,
+        [memberId, JSON.stringify({ name: "W", token: "[redacted]" })],
+      );
+      const declined = await call(base, "/audit?outcome=declined", { cookie: admin });
+      expect(declined.body).toHaveLength(1);
+      expect(declined.body[0]).toMatchObject({ outcome: "declined", source: "chat", args: { name: "W", token: "[redacted]" } });
+      // A member sees the args of their own declined row, but not other users' rows.
+      expect((await call(base, "/audit?outcome=declined", { cookie: member })).body[0].args).toEqual({ name: "W", token: "[redacted]" });
+      const old = await call(base, "/audit?server=fx&outcome=ok", { cookie: admin });
+      expect(old.body[0].args).toBeNull();
+    });
+
     it("pages with limit and before", async () => {
       const first = await call(base, "/audit?limit=3", { cookie: admin });
       expect(first.body).toHaveLength(3);

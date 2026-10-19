@@ -115,14 +115,14 @@ describe("/mcp endpoint", () => {
     expect(tools.map((t) => t.name).sort()).toEqual(["fx__convert", "woo__list_orders"]);
   });
 
-  it("routes a call and audits it under the key's user, without arguments", async () => {
+  it("routes a call and audits it under the key's user, with its args and secret-looking fields redacted", async () => {
     const client = await connect(alice.key);
-    const result = await client.callTool({ name: "woo__list_orders", arguments: { text: "top-secret-arg" } });
-    expect(JSON.stringify(result.content)).toContain("orders top-secret-arg");
+    const result = await client.callTool({ name: "woo__list_orders", arguments: { text: "visible-arg", token: "hidden-arg" } });
+    expect(JSON.stringify(result.content)).toContain("orders visible-arg");
     const { rows } = await pool.query("SELECT * FROM audit_log");
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ user_id: alice.id, server_slug: "woo", tool: "list_orders", outcome: "ok", source: "mcp" });
-    expect(JSON.stringify(rows)).not.toContain("top-secret-arg");
+    expect(rows[0]).toMatchObject({ user_id: alice.id, server_slug: "woo", tool: "list_orders", outcome: "ok", source: "mcp", args: { text: "visible-arg", token: "[redacted]" } });
+    expect(JSON.stringify(rows)).not.toContain("hidden-arg");
   });
 
   it("returns an error result for an unknown tool", async () => {

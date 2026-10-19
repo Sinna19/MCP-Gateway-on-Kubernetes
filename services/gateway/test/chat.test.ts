@@ -244,6 +244,17 @@ describe("ChatAgent", () => {
     expect(JSON.stringify(seen[1])).toContain("user declined");
   });
 
+  it("a declined confirm is audited once as declined/chat with the server-held args, and nothing goes upstream", async () => {
+    const a = agent(scripted(assistantCalls(toolCall("c1", "woo__create_product", { name: "W", token: "t" })), say("ok, skipped")));
+    const first = await a({ user, messages: [user1] });
+    expect(await audit()).toHaveLength(0); // proposing is not a call
+    await a({ user, messages: [user1], confirm: { id: first.pendingToolCall!.id, approve: false } });
+    expect(calls).toHaveLength(0);
+    expect(await audit()).toMatchObject([
+      { tool: "create_product", server_slug: "woo", outcome: "declined", source: "chat", user_id: String(user.id), args: { name: "W", token: "[redacted]" } },
+    ]);
+  });
+
   it("another user cannot confirm, and the id still works for its owner", async () => {
     const a = agent(scripted(assistantCalls(toolCall("c1", "woo__create_product", {})), say("ok")));
     const first = await a({ user, messages: [user1] });

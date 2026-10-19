@@ -6,7 +6,7 @@ import { currentUser, requireUser } from "./middleware.js";
 const query = z.object({
   user: z.coerce.number().int().positive().optional(),
   server: z.string().max(20).optional(),
-  outcome: z.enum(["ok", "error"]).optional(),
+  outcome: z.enum(["ok", "error", "declined"]).optional(),
   source: z.enum(["mcp", "chat"]).optional(),
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -22,7 +22,7 @@ export function auditRoutes(pool: pg.Pool): Router {
     // A member always sees only their own rows, whatever ?user= says.
     const userId = me.role === "admin" ? (q.user ?? null) : me.id;
     const { rows } = await pool.query(
-      `SELECT a.id, u.email AS "user", a.server_slug, a.tool, a.started_at, a.duration_ms, a.outcome, a.error, a.source
+      `SELECT a.id, u.email AS "user", a.server_slug, a.tool, a.started_at, a.duration_ms, a.outcome, a.error, a.source, a.args
          FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
         WHERE ($1::bigint IS NULL OR a.user_id = $1)
           AND ($2::text IS NULL OR a.server_slug = $2)
@@ -43,6 +43,7 @@ export function auditRoutes(pool: pg.Pool): Router {
         outcome: r.outcome,
         error: r.error,
         source: r.source,
+        args: r.args, // redacted and capped when written; may hold customer data, which a member only sees on their own rows
       })),
     );
   });

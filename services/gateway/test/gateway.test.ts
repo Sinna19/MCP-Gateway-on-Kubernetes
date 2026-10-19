@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AuthUser } from "../src/api-keys.js";
@@ -44,7 +45,66 @@ describe("Gateway.callTool", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ user_id: user.id, server_slug: "woo", tool: "list_orders", outcome: "ok", error: null, source: "chat" });
     expect(rows[0].duration_ms).toBeGreaterThanOrEqual(0);
-    expect(JSON.stringify(rows)).not.toContain("arg");
+  });
+
+  it("stores the args as sent, with secret-looking keys redacted, and does not change what goes upstream", async () => {
+    let sent: unknown;
+    backend.callTool = async (_slug, _tool, args) => {
+      sent = args;
+      return { content: [{ type: "text", text: "fine" }] };
+    };
+    const visible = randomBytes(12).toString("hex");
+    const args = { name: "Widget", token: visible, nested: { password: visible } };
+    await gateway.callTool(user, "woo__create_product", args, "mcp");
+    expect(sent).toEqual({ name: "Widget", token: visible, nested: { password: visible } });
+    const rows = await audit();
+    expect(rows[0].args).toEqual({ name: "Widget", token: "[redacted]", nested: { password: "[redacted]" } });
+    expect(JSON.stringify(rows)).not.toContain(visible);
+  });
+
+  it("a failed call still carries its redacted args", async () => {
+    backend.callTool = async () => ({ isError: true, content: [{ type: "text", text: "nope" }] });
+    await gateway.callTool(user, "woo__t", { token: "t", q: 1 }, "mcp");
+    expect((await audit())[0]).toMatchObject({ outcome: "error", args: { token: "[redacted]", q: 1 } });
+  });
+
+  it("args are null when the caller sent none", async () => {
+    await gateway.callTool(user, "woo__t", undefined, "mcp");
+    expect((await audit())[0].args).toBeNull();
+  });
+
+  it("oversized args are stored as a truncated marker", async () => {
+    await gateway.callTool(user, "woo__t", { blob: "x".repeat(5000) }, "mcp");
+    expect((await audit())[0].args).toMatchObject({ _truncated: true });
+  });
+
+  describe("recordDeclined", () => {
+    it("writes a declined chat row with redacted args and never calls the backend", async () => {
+      let called = false;
+      backend.callTool = async () => {
+        called = true;
+        return { content: [] };
+      };
+      await gateway.recordDeclined(user, "woo__create_product", { name: "W", api_key: "k" });
+      expect(called).toBe(false);
+      const rows = await audit();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        user_id: user.id,
+        server_slug: "woo",
+        tool: "create_product",
+        outcome: "declined",
+        source: "chat",
+        duration_ms: 0,
+        error: null,
+        args: { name: "W", api_key: "[redacted]" },
+      });
+    });
+
+    it("cuts a long tool name to 100 characters", async () => {
+      await gateway.recordDeclined(user, `woo__${"y".repeat(300)}`, {});
+      expect((await audit())[0].tool.length).toBe(100);
+    });
   });
 
   it("an unknown tool name is an error result and is audited", async () => {

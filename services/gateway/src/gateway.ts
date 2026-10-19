@@ -1,10 +1,12 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type pg from "pg";
 import type { AuthUser } from "./api-keys.js";
+import { auditArgs } from "./audit-args.js";
 import { splitName } from "./tool-names.js";
 import { UpstreamError } from "./upstreams.js";
 
 export type CallSource = "mcp" | "chat";
+type Outcome = "ok" | "error" | "declined";
 
 // What the gateway needs from the upstream manager (a plain object in tests).
 export interface ToolBackend {
@@ -56,15 +58,23 @@ export class Gateway {
       error = "internal error";
       return errorResult("internal error while calling the tool");
     } finally {
-      await this.audit(user, parts?.slug ?? null, (parts?.tool ?? name).slice(0, MAX_TOOL_NAME), startedAt, Math.round(performance.now() - timer), outcome, error, source);
+      await this.audit(user, name, args, startedAt, Math.round(performance.now() - timer), outcome, error, source);
     }
   }
 
-  private async audit(user: AuthUser, slug: string | null, tool: string, startedAt: Date, durationMs: number, outcome: string, error: string | null, source: CallSource): Promise<void> {
+  // The user declined a held chat write: audited like a call, but nothing is sent upstream.
+  async recordDeclined(user: AuthUser, name: string, args: Record<string, unknown> | undefined): Promise<void> {
+    await this.audit(user, name, args, new Date(), 0, "declined", null, "chat");
+  }
+
+  // The one audit writer, for calls and declines: the tool name split and the args redaction live here only.
+  private async audit(user: AuthUser, name: string, args: Record<string, unknown> | undefined, startedAt: Date, durationMs: number, outcome: Outcome, error: string | null, source: CallSource): Promise<void> {
+    const parts = splitName(name);
+    const stored = auditArgs(args);
     try {
       await this.pool.query(
-        "INSERT INTO audit_log (user_id, server_slug, tool, started_at, duration_ms, outcome, error, source) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        [user.id, slug, tool, startedAt, durationMs, outcome, error?.slice(0, MAX_AUDIT_ERROR) ?? null, source],
+        "INSERT INTO audit_log (user_id, server_slug, tool, started_at, duration_ms, outcome, error, source, args) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [user.id, parts?.slug ?? null, (parts?.tool ?? name).slice(0, MAX_TOOL_NAME), startedAt, durationMs, outcome, error?.slice(0, MAX_AUDIT_ERROR) ?? null, source, stored === null ? null : JSON.stringify(stored)],
       );
     } catch (err) {
       console.error("audit write failed:", err instanceof Error ? err.message : err);
