@@ -112,8 +112,8 @@ In this order:
 - **Accept:** regenerated Woo password works without restart; woo-mcp rejects calls without the token; audit shows args and declined confirms; `scripts/dod-check.sh` rerun.
 
 ### 7e Tool permissions per role (stand-out #2)
-- [ ] Admin sets per server/tool which roles may use it; restricted tools are hidden from `tools/list` and rejected if called directly (MCP and chat). Default: members get read tools only for woo (no order status changes or product creation).
-- [ ] ADR in `docs/decisions/`
+- [x] Admin sets per server/tool which roles may use it; restricted tools are hidden from `tools/list` and rejected if called directly (MCP and chat). Default: members get read tools only for woo (no order status changes or product creation).
+- [x] ADR in `docs/decisions/`
 - **Accept:** member cannot see or call `create_product` / `update_order_status` over MCP or chat; admin can; `scripts/dod-check.sh` rerun.
 
 ### 7f Key and image hygiene
