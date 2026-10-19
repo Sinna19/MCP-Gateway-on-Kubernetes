@@ -107,8 +107,10 @@ else
   echo "secret gateway-app: created"
 fi
 
-# LLM key for the chat agent (optional). Only created when LLM_API_KEY is set in your shell, so the key
-# never appears in a file (it is briefly in the kubectl process args, like any --from-literal). Chat answers 503 until this Secret exists. Set it with:
+# LLM key for the chat agent (optional). Chat answers 503 until this Secret exists. Preferred: create it
+# yourself before `make deploy`, so the key never goes through argv (docs/REHEARSAL.md step 4 has the one-liner).
+# Fallback below: when LLM_API_KEY is set in your shell this script creates it, but then the key is briefly
+# in the kubectl process args (--from-literal):
 #   read -rs LLM_API_KEY; export LLM_API_KEY; scripts/secrets.sh; unset LLM_API_KEY
 # Wrong key typed? kubectl -n urumi delete secret llm-api, then repeat. Restart the gateway to pick it up.
 if kubectl -n "$NS" get secret llm-api >/dev/null 2>&1; then
