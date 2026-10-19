@@ -1,18 +1,15 @@
 # Handoff
-- **Done this session (7e verified on the cluster, no code changes):**
-  - 831b1d2 docs(plan): 7e ticked. Earlier 7e code: 15a2715 (gateway), aeb2193 (dashboard), ab0dde8 (ADR 022).
-  - `make images && make deploy && make register`: migration 006 ran, `tool_rules` has woo `create_product` and `update_order_status` = admin only.
-  - Member key: `tools/list` has no write tools; direct call gives `-32602 tool not permitted for your role`; audit row (outcome=error, source=mcp) shows it.
-  - Admin key lists both write tools and `woo__list_products` works (no product created).
-  - Member chat asking for an order status change: no `pendingToolCall`, no tool calls.
-  - Member SSE stream got `notifications/tools/list_changed` on PATCH `list_orders` true and again on false.
-  - `make register` twice leaves the rules unchanged. Gateway restarted, `make dod` 8/8 (first run 7/8, see gotchas).
+- **Done this session (7f part 1, key rotation, verified on the cluster):**
+  - 2ae3d80 `reencryptCredentials` + `rotate-main.ts` entrypoint, 4 tests (rollback, same key, no leaks) written first.
+  - 30c98cf `scripts/rotate-credentials-key.sh` (`make rotate-key`), NetworkPolicy for the Job pod, Postgres ingress allows it, ADR 023 (rotation part).
+  - dc0452b PLAN 7f rotation ticked, gateway rule line, explain doc line 104 fixed.
+  - Live `make rotate-key`: 3 credentials re-encrypted, prefixes changed (fx `pLK5…`→`Wc0G…`, woo `EcYZ…`→`75/j…`), all servers connected, `gateway-key-*` Secrets and Job gone, gateway RESTARTS 0. `make dod` 8/8, `make test` ok.
 - **In progress:** nothing. Tree is clean after this commit.
-- **Next step:** `7 7f key rotation` (CREDENTIALS_KEY rotation script + ADR; image digest pinning or documented reason is the second 7f group, do it in a separate session). See `docs/PLAN.md` 7f.
+- **Next step:** `7 7f image digests` (second 7f group, a separate session, as agreed). Plan: `docker pull` + `docker inspect --format '{{index .RepoDigests 0}}'` for postgres:17.6-alpine, mariadb:11.4.13, wordpress:7.1.3-php8.3-apache, wordpress:cli-2.12.0-php8.3, nginxinc/nginx-unprivileged:1.31.7-alpine, node:24.20.0-alpine. Pin them as `repo:tag@sha256:…` in `charts/gateway/values.yaml:67`, `charts/store/values.yaml:3,22,44` and every Dockerfile `FROM` (build stages too). Then fill the "Images by digest" section of ADR 023 (tree-hash tags are already content-addressed; a digest bump is a planned restart). Pin busybox in the NetworkPolicy probe example in `.claude/rules/kubernetes.md`.
+  - Expect: every service image tag changes once (Dockerfiles are in the tree hash); Postgres, MariaDB and WordPress restart. Wait for all pods Ready, then `make images && make deploy`, `make register`, `make dod`. Accept: `kubectl -n urumi get pods -o jsonpath` image list shows `@sha256:` on third-party images. Run the `k8s-reviewer` agent on the chart change. Tick the second 7f box.
 - **Gotchas learned:**
-  - `make dod` check f failed once with `curl: (6) Could not resolve host: app.localtest.me` (local DNS blip); rerun passed. Check the curl error before suspecting the gateway.
-  - PATCHing a tool rule to `false` inserts a `tool_rules` row (`woo|list_orders|f`). Harmless, but the table then has 3 rows, not 2.
-  - This shell has no `pgrep`; a Monitor that greps the output file also matches earlier lines of it, so match a line only the final step prints.
-  - Postgres access: `kubectl -n urumi exec gateway-postgres-0 -- sh -c 'psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-$POSTGRES_USER}" ...'`; the table is `upstream_servers`, not `servers`.
-  - On `/mcp` the error text is `MCP error -32602: ...` (SDK prefix); the audit row has the plain text.
-- **Files the next task needs:** `docs/PLAN.md` (7f), `docs/decisions/` (next ADR number), `.claude/rules/gateway.md`, the gateway code that encrypts/decrypts upstream credentials (grep `CREDENTIALS_KEY` in `services/gateway/src` and `charts/`), `scripts/dod-check.sh`.
+  - The first `make test` failed with `Duration 2243s` and no failure text; rerun passed (all 5 projects pass alone). Treat as a stall (sleep/Docker), rerun before debugging.
+  - `kubectl` on Windows cannot open `/tmp/...` paths: use `cygpath -m` (`winpath` in the rotate script) for `--from-file`, `-f`, `--patch-file`.
+  - `make rotate-key` stops if `gateway-key-old/new` exist (an earlier run did not finish); `rotate-credentials-key.sh finish` only copies `gateway-key-new` into `gateway-app`.
+  - Psql check of ciphertext prefixes: `left(credential_enc,16)` is the IV (not secret).
+- **Files the next task needs:** `docs/PLAN.md` (7f), `docs/decisions/023-credentials-key-rotation-and-image-digests.md`, `charts/gateway/values.yaml`, `charts/store/values.yaml`, the five `Dockerfile`s (`services/*`, `apps/dashboard`), `.claude/rules/kubernetes.md`, `Makefile` (image build lines only).
