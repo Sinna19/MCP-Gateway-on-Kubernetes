@@ -15,7 +15,7 @@ Two weeks. A working core beats an unfinished bonus. Each phase ends with accept
 | 8. VPS (k3s) | 12 | Same charts on a VPS with values-prod.yaml, TLS optional |
 | 9. Docs + demo | 13 to 14 | README, DESIGN, THREAT_MODEL, stand-out list, demo video |
 
-Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) and SSRF protection (#6). Both are small given this design.
+Stretch: none left. Tool permissions per role (stand-out #2) is now in phase 7 (7e); SSRF protection (#6) is done.
 
 ---
 
@@ -76,18 +76,54 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [x] (6d, 2026-10-17, two members, plus injection and disabled-server checks) **Accept:** as user A, "create a product called X for 19.99" appears on storefront; after a manual order, "what orders came in today" returns it; audit shows user A.
 
 ## Phase 7: DoD run + hardening
-- [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled.
-- [ ] NetworkPolicies: MariaDB accepts only WordPress + setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`); woo-mcp egress only to store-wordpress + DNS (kube-system CoreDNS)
-- [ ] Full manual rehearsal with users A and B, following the DoD in `docs/ASSIGNMENT.md`
+Tasks 7a to 7g, one per session. Every task's Accept includes rerunning `scripts/dod-check.sh`.
+
+### 7a DoD script
+- [ ] `scripts/dod-check.sh` automates what it can (key revoke rejects, disabled server tools gone, pod kill keeps others working, audit rows per user). make register leaves a disabled server disabled. Includes the disabled-server check.
+- [ ] Run it now as a baseline and report PASS/FAIL per check.
+- **Accept:** script runs end to end; PASS/FAIL per check reported; `scripts/dod-check.sh` rerun shows the same result.
+
+### 7b NetworkPolicies
+Verify each with one blocked and one allowed curl (k3s rejects = exit 7; new pods need ~10s for policy sync).
+- [ ] MariaDB ingress only from WordPress + setup Job (pods labelled `app.kubernetes.io/name` = `wordpress` or `setup`)
+- [ ] woo-mcp egress only to store-wordpress + DNS (kube-system CoreDNS); check what phase 2 already has
+- [ ] Gateway ingress only from Traefik (kube-system)
+- [ ] Gateway egress: DNS, Postgres, the three upstream pods, TCP 443 to 0.0.0.0/0 except 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (LLM host must stay reachable). Closes the SSRF gap in ADR 009.
+- [ ] fx-mcp and notes-mcp: ingress from gateway only, deny all egress except DNS
+- [ ] Dashboard: ingress from Traefik only, deny egress
+- **Accept:** one blocked and one allowed curl per policy shown; `scripts/dod-check.sh` rerun.
+
+### 7c Gateway limits and cleanup
+In this order:
+- [ ] Revoking a key or disabling a user closes its open MCP sessions/SSE streams (ADR 014)
+- [ ] Login rate limiting on `POST /api/auth/login` (per IP + per email, 429)
+- [ ] Per-key rate limit on `/mcp` tool calls (429, configurable in values) (stand-out #7)
+- [ ] Per-user daily chat cap (Postgres counter, 429, configurable in values)
+- [ ] `/mcp` session cap per API key; sweep sessions whose `initialize` failed
+- [ ] Periodic expired-session sweep (Postgres sessions table)
+- [ ] Throttle `api_keys.last_used_at` writes (at most once per minute per key)
+- **Accept:** tests for each limit pass (`make test`); 429s shown with curl; `scripts/dod-check.sh` rerun.
+
+### 7d Upstream and audit fixes
 - [ ] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
-- [ ] Optional: woo-mcp requires a bearer token, sent by the gateway as an upstream credential
-- [ ] Gateway NetworkPolicy: ingress only from Traefik (kube-system)
-- [ ] woo-mcp hop token (gateway sends it as an upstream credential)
-- [ ] CREDENTIALS_KEY rotation (re-encrypt stored credentials)
-- [ ] Throttle `api_keys.last_used_at` writes
-- [ ] `/mcp` session cap per key, and sweep sessions whose `initialize` failed
-- [ ] Gateway egress NetworkPolicy: only Postgres, upstream pods, DNS and the LLM endpoint (closes the SSRF gap in ADR 009)
-- **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster.
+- [ ] woo-mcp requires a bearer token, sent by the gateway as an upstream credential (hop token; was optional, now required)
+- [ ] fx-mcp and notes-mcp log one line on 401 (never the key)
+- [ ] Audit: record tool args (size-capped, never secrets) and declined chat confirms as rows
+- **Accept:** regenerated Woo password works without restart; woo-mcp rejects calls without the token; audit shows args and declined confirms; `scripts/dod-check.sh` rerun.
+
+### 7e Tool permissions per role (stand-out #2)
+- [ ] Admin sets per server/tool which roles may use it; restricted tools are hidden from `tools/list` and rejected if called directly (MCP and chat). Default: members get read tools only for woo (no order status changes or product creation).
+- [ ] ADR in `docs/decisions/`
+- **Accept:** member cannot see or call `create_product` / `update_order_status` over MCP or chat; admin can; `scripts/dod-check.sh` rerun.
+
+### 7f Key and image hygiene
+- [ ] CREDENTIALS_KEY rotation: script re-encrypts upstream credentials from the old key to the new one, documented in an ADR
+- [ ] Pin images by digest in values (or document why tag + tree hash is enough)
+- **Accept:** rotate on a running cluster, upstream calls still work; images pinned or the reason documented; `scripts/dod-check.sh` rerun.
+
+### 7g Full manual rehearsal
+- [ ] Full manual rehearsal with users A and B on a fresh cluster, following the DoD in `docs/ASSIGNMENT.md`
+- **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster; `scripts/dod-check.sh` rerun.
 
 ## Phase 8: VPS (k3s)
 - [ ] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
@@ -105,4 +141,5 @@ Stretch, only once phase 9 is drafted: tool permissions per role (stand-out #2) 
 - [ ] `docs/THREAT_MODEL.md` (the four required questions)
 - [ ] GitHub Actions CI: make lint + tests on every push (stand-out item)
 - [ ] Stand-out items list with file pointers
+- [ ] Stand-out list: #1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI.
 - [ ] Demo script following the six required video sections; record
