@@ -1,15 +1,14 @@
 # Handoff
-- **Done this session (7f part 1, key rotation, verified on the cluster):**
-  - 2ae3d80 `reencryptCredentials` + `rotate-main.ts` entrypoint, 4 tests (rollback, same key, no leaks) written first.
-  - 30c98cf `scripts/rotate-credentials-key.sh` (`make rotate-key`), NetworkPolicy for the Job pod, Postgres ingress allows it, ADR 023 (rotation part).
-  - dc0452b PLAN 7f rotation ticked, gateway rule line, explain doc line 104 fixed.
-  - Live `make rotate-key`: 3 credentials re-encrypted, prefixes changed (fx `pLK5…`→`Wc0G…`, woo `EcYZ…`→`75/j…`), all servers connected, `gateway-key-*` Secrets and Job gone, gateway RESTARTS 0. `make dod` 8/8, `make test` ok.
+- **Done this session (7f part 2, image digests, verified on the cluster):**
+  - c854499 every third-party image pinned as `name:tag@sha256:<index digest>`: postgres (`charts/gateway/values.yaml`), mariadb, wordpress, wp-cli (`charts/store/values.yaml`), all Dockerfile `FROM` lines incl. build stages (node, nginx-unprivileged), busybox probe example in `.claude/rules/kubernetes.md`.
+  - 3685c04 ADR 023 "Images by digest" filled (why, how to bump, trade-off); rotate-key finish recovery was already in the ADR. PLAN 7f ticked.
+  - Live: `make lint` ok, `make images`, `make deploy`, all 8 pods 1/1 Ready, RESTARTS 0, `make register` all connected, `make dod` 8/8.
+  - `kubectl get pods -n urumi` images: mariadb, postgres, wordpress and wp-cli show `@sha256:`; our `urumi/*` images use tree-hash tags (their bases are pinned in the Dockerfiles).
 - **In progress:** nothing. Tree is clean after this commit.
-- **Next step:** `7 7f image digests` (second 7f group, a separate session, as agreed). Plan: `docker pull` + `docker inspect --format '{{index .RepoDigests 0}}'` for postgres:17.6-alpine, mariadb:11.4.13, wordpress:7.1.3-php8.3-apache, wordpress:cli-2.12.0-php8.3, nginxinc/nginx-unprivileged:1.31.7-alpine, node:24.20.0-alpine. Pin them as `repo:tag@sha256:…` in `charts/gateway/values.yaml:67`, `charts/store/values.yaml:3,22,44` and every Dockerfile `FROM` (build stages too). Then fill the "Images by digest" section of ADR 023 (tree-hash tags are already content-addressed; a digest bump is a planned restart). Pin busybox in the NetworkPolicy probe example in `.claude/rules/kubernetes.md`.
-  - Expect: every service image tag changes once (Dockerfiles are in the tree hash); Postgres, MariaDB and WordPress restart. Wait for all pods Ready, then `make images && make deploy`, `make register`, `make dod`. Accept: `kubectl -n urumi get pods -o jsonpath` image list shows `@sha256:` on third-party images. Run the `k8s-reviewer` agent on the chart change. Tick the second 7f box.
+- **Next step:** `7 7g full manual rehearsal`
 - **Gotchas learned:**
-  - The first `make test` failed with `Duration 2243s` and no failure text; rerun passed (all 5 projects pass alone). Treat as a stall (sleep/Docker), rerun once. If it stalls again, find which suite hangs (run each `npm --prefix <project> test` alone with `timeout`) before doing anything else.
-  - `kubectl` on Windows cannot open `/tmp/...` paths: use `cygpath -m` (`winpath` in the rotate script) for `--from-file`, `-f`, `--patch-file`.
-  - `make rotate-key` stops if `gateway-key-old/new` exist (an earlier run did not finish); `rotate-credentials-key.sh finish` only copies `gateway-key-new` into `gateway-app`.
-  - Psql check of ciphertext prefixes: `left(credential_enc,16)` is the IV (not secret).
-- **Files the next task needs:** `docs/PLAN.md` (7f), `docs/decisions/023-credentials-key-rotation-and-image-digests.md`, `charts/gateway/values.yaml`, `charts/store/values.yaml`, the five `Dockerfile`s (`services/*`, `apps/dashboard`), `.claude/rules/kubernetes.md`, `Makefile` (image build lines only).
+  - `kubectl wait --for=condition=Ready pod --all` times out right after `make deploy` because the Completed `setup-*` pod never becomes Ready and pods were still rolling; check `kubectl get pods` instead.
+  - `docker buildx imagetools inspect IMAGE` first `Digest:` line is the index digest (use `grep -m1 '^Digest:'`).
+  - `k8s-reviewer` was not run on this chart change (values-only image strings); run it before the 7g rehearsal if wanted.
+  - Earlier gotchas still apply: `kubectl` on Windows needs `cygpath -m` for `/tmp` paths; first `make test` can stall (rerun once).
+- **Files the next task needs:** `docs/PLAN.md` (7g), `docs/ASSIGNMENT.md` (Definition of Done wording only), `scripts/dod-check.sh`, `Makefile` (cluster-up/images/deploy/register targets).
