@@ -5,7 +5,7 @@ TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
 TS_PROJECTS := $(addprefix services/,$(TS_SERVICES)) apps/dashboard
 
 .NOTPARALLEL:
-.PHONY: cluster-up cluster-down images deps secrets deploy register lint test dod
+.PHONY: cluster-up cluster-down images deps secrets deploy register lint test dod rotate-key
 
 cluster-up:
 	scripts/cluster-up.sh
@@ -80,3 +80,7 @@ test:
 
 dod:
 	scripts/dod-check.sh
+
+# Re-encrypts the stored upstream credentials under a new CREDENTIALS_KEY (ADR 023). The gateway is down ~30s.
+rotate-key:
+	scripts/rotate-credentials-key.sh

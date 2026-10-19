@@ -1,0 +1,35 @@
+# The one-off Job made by scripts/rotate-credentials-key.sh (ADR 023). It may reach DNS and Postgres, nothing else,
+# and nobody may reach it. Its label differs from the gateway's on purpose: the gateway Service would select it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-rotate-key
+  labels:
+    app.kubernetes.io/name: gateway-rotate-key
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-rotate-key
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway-postgres
+      ports:
+        - port: 5432
+          protocol: TCP
