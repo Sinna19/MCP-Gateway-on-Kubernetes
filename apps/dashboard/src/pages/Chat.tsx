@@ -35,7 +35,8 @@ type Entry = { kind: "user" | "assistant"; text: string } | ({ kind: "tool" } & 
 function errorText(err: unknown, confirming: boolean): string {
   if (!(err instanceof ApiError)) return "Request failed, try again";
   if (err.status === 503) return "Chat isn't configured";
-  if (err.status === 429) return "Chat is busy or rate limited, try again in a moment";
+  // The gateway's own 429 says why (still answering the last message, or the daily limit); anything else gets a generic line.
+  if (err.status === 429) return err.message.startsWith("request failed") ? "Chat is busy or rate limited, try again in a moment" : err.message;
   if (err.status === 413) return "Conversation too long, start a new chat";
   if (err.status === 404 && confirming) return "Confirmation expired, ask again";
   return err.message;

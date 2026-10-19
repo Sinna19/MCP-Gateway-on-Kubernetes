@@ -43,6 +43,9 @@ limits:
     windowSeconds: 900
   mcp:
     callsPerMinute: 60 # tools/call per API key
+    sessionsPerKey: 10 # open /mcp sessions per API key; the next initialize gets 429
+  chat:
+    dailyCap: 200 # POST /api/chat per user per UTC day, counted in Postgres (so it survives a restart)
 
 # First upstream registered on first start (in-cluster woo-mcp Service).
 seedWooUrl: http://woo-mcp:3000/mcp

@@ -194,7 +194,6 @@ describe("chat page", () => {
 describe("chat errors", () => {
   const cases: [number, string][] = [
     [503, "Chat isn't configured"],
-    [429, "busy or rate limited"],
     [413, "Conversation too long, start a new chat"],
   ];
   it.each(cases)("maps %i to a clear message and keeps the typed text", async (status, text) => {
@@ -204,6 +203,21 @@ describe("chat errors", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
     expect(screen.getByLabelText("Message")).toBeEnabled();
     expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("hello");
+  });
+
+  it("429 shows the gateway's own reason as plain text (busy, or the daily limit) and keeps the typed text", async () => {
+    stubApi(gateway(() => ({ status: 429, body: { error: "daily chat limit reached (200 messages), it resets at 00:00 UTC" } })));
+    await openChat();
+    await ask("hello");
+    expect(await screen.findByRole("alert")).toHaveTextContent("daily chat limit reached (200 messages), it resets at 00:00 UTC");
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("hello");
+  });
+
+  it("429 without a JSON reason (e.g. from a proxy) gets the generic line", async () => {
+    stubApi(gateway(() => ({ status: 429, body: {} })));
+    await openChat();
+    await ask("hello");
+    expect(await screen.findByRole("alert")).toHaveTextContent("busy or rate limited");
   });
 
   it("404 on confirm says the confirmation expired and removes the card", async () => {

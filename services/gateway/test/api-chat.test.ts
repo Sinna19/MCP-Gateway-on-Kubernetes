@@ -141,4 +141,76 @@ describe("POST /api/chat", () => {
     expect((await slow).status).toBe(200);
     expect((await chat({ messages: [ask("three")] })).status).toBe(200); // free again afterwards
   });
+
+  describe("daily cap", () => {
+    const capped = (cap: number) => ({ loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 60, mcpSessionsPerKey: 10, chatDailyCap: cap });
+
+    async function startCapped(cap: number, llm: LlmFn) {
+      const b = backend();
+      server = await startServer(pool, b.upstreams, { llm, chatReadOnlyTools: new Set(["woo__list_orders"]), limits: capped(cap), now: () => Date.parse("2026-03-10T23:00:00Z") });
+      cookie = await login(server.base, "bob@x.io");
+      return b;
+    }
+
+    it("answers 429 + Retry-After + a readable message once the day's turns are used, without calling the LLM", async () => {
+      let llmCalls = 0;
+      await startCapped(1, async () => {
+        llmCalls++;
+        return say("hi");
+      });
+      expect((await chat({ messages: [ask("one")] })).status).toBe(200);
+      const second = await chat({ messages: [ask("two")] });
+      expect(second.status).toBe(429);
+      expect(second.headers.get("retry-after")).toBe("3600"); // 23:00 -> midnight
+      expect(second.body.error).toContain("daily chat limit");
+      expect(llmCalls).toBe(1);
+    });
+
+    it("counts a confirm continuation, since it calls the LLM too", async () => {
+      let n = 0;
+      await startCapped(2, async () => (n++ === 0 ? calls("woo__create_product", { name: "W" }) : say("created")));
+      const first = await chat({ messages: [ask("create W")] });
+      const pending = first.body.pendingToolCall as { id: string };
+      expect((await chat({ messages: [ask("create W")], confirm: { id: pending.id, approve: true } })).status).toBe(200);
+      expect((await chat({ messages: [ask("again")] })).status).toBe(429);
+    });
+
+    it("does not count a request with an invalid body", async () => {
+      await startCapped(1, async () => say("hi"));
+      expect((await chat({ messages: [] })).status).toBe(400);
+      expect((await chat({ messages: [ask("ok")] })).status).toBe(200);
+    });
+
+    it("does not spend a turn on a request refused as busy", async () => {
+      let release!: () => void;
+      let started!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const llmStarted = new Promise<void>((r) => (started = r));
+      await startCapped(2, async () => {
+        started();
+        await gate;
+        return say("late");
+      });
+      const slow = chat({ messages: [ask("one")] });
+      await llmStarted;
+      expect((await chat({ messages: [ask("busy")] })).status).toBe(429); // busy, not capped
+      release();
+      expect((await slow).status).toBe(200);
+      const { rows } = await pool.query("SELECT count FROM chat_usage WHERE user_id = $1", [userId]);
+      expect(rows).toEqual([{ count: 1 }]);
+      expect((await chat({ messages: [ask("two")] })).status).toBe(200); // the second turn of 2 is still there
+    });
+
+    it("keeps the pending confirmation when the confirm is refused by the cap", async () => {
+      let n = 0;
+      await startCapped(1, async () => (n++ === 0 ? calls("woo__create_product", { name: "W" }) : say("created")));
+      const first = await chat({ messages: [ask("create W")] });
+      const pending = first.body.pendingToolCall as { id: string };
+      const refused = await chat({ messages: [ask("create W")], confirm: { id: pending.id, approve: true } });
+      expect(refused.status).toBe(429);
+      // next day the same confirm id still works
+      await pool.query("DELETE FROM chat_usage");
+      expect((await chat({ messages: [ask("create W")], confirm: { id: pending.id, approve: true } })).status).toBe(200);
+    });
+  });
 });

@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createKey, findUserByKey, generateKey, hashKey, revokeKey } from "../src/api-keys.js";
+import { createKey, findUserByKey, generateKey, hashKey, KeyUsage, revokeKey } from "../src/api-keys.js";
 import { createTestDb, resetData } from "./helpers.js";
 
 describe("generateKey", () => {
@@ -60,5 +60,48 @@ describe("keys in the database", () => {
     const { key } = await createKey(pool, userId, "laptop");
     await pool.query("UPDATE users SET disabled_at = now() WHERE id = $1", [userId]);
     expect(await findUserByKey(pool, key)).toBeNull();
+  });
+
+  describe("last_used_at throttle", () => {
+    let clock = 0;
+    const lastUsed = async () => (await pool.query("SELECT last_used_at FROM api_keys")).rows[0].last_used_at as Date | null;
+    const setOld = () => pool.query("UPDATE api_keys SET last_used_at = '2020-01-01'");
+
+    it("writes on first use, then at most once per 60 seconds", async () => {
+      clock = 1_000_000;
+      const usage = new KeyUsage(() => clock);
+      const { key } = await createKey(pool, userId, "laptop");
+      expect(await lastUsed()).toBeNull();
+      await findUserByKey(pool, key, usage);
+      expect(await lastUsed()).not.toBeNull();
+      await setOld();
+      clock += 30_000;
+      await findUserByKey(pool, key, usage);
+      expect((await lastUsed())!.getUTCFullYear()).toBe(2020); // throttled: not written
+      clock += 31_000;
+      await findUserByKey(pool, key, usage);
+      expect((await lastUsed())!.getUTCFullYear()).toBeGreaterThan(2020);
+    });
+
+    it("still authenticates every time, throttled or not", async () => {
+      const usage = new KeyUsage(() => clock);
+      const { key } = await createKey(pool, userId, "laptop");
+      for (let i = 0; i < 3; i++) expect(await findUserByKey(pool, key, usage)).toMatchObject({ id: userId });
+    });
+
+    it("forget() lets the next use write again; sweep() drops old entries", async () => {
+      clock = 1_000_000;
+      const usage = new KeyUsage(() => clock);
+      const { key, id } = await createKey(pool, userId, "laptop");
+      await findUserByKey(pool, key, usage);
+      expect(usage.size).toBe(1);
+      await setOld();
+      usage.forget(Number(id)); // pg returns bigint ids as strings
+      await findUserByKey(pool, key, usage);
+      expect((await lastUsed())!.getUTCFullYear()).toBeGreaterThan(2020);
+      clock += 61_000;
+      usage.sweep();
+      expect(usage.size).toBe(0);
+    });
   });
 });

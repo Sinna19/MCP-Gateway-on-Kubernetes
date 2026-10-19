@@ -3,10 +3,12 @@ export interface Limits {
   loginPerIp: number; // attempts per client IP per login window (successful logins give theirs back)
   loginWindowMs: number;
   mcpCallsPerMinute: number; // tools/call per API key
+  mcpSessionsPerKey: number; // open /mcp sessions per API key
+  chatDailyCap: number; // POST /api/chat per user per UTC day (kept in Postgres, see chat/daily-cap.ts)
 }
 
 // dod-check makes 12 MCP requests on its busiest key in a whole run, far below 60.
-export const DEFAULT_LIMITS: Limits = { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 15 * 60_000, mcpCallsPerMinute: 60 };
+export const DEFAULT_LIMITS: Limits = { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 15 * 60_000, mcpCallsPerMinute: 60, mcpSessionsPerKey: 10, chatDailyCap: 200 };
 
 export type Take = { ok: true } | { ok: false; retryAfterSeconds: number };
 

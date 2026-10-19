@@ -31,6 +31,7 @@ export interface AgentOptions {
   llmTimeoutMs?: number;
   budgetMs?: number;
   now?: () => number; // tests move the clock to hit the deadline
+  beforeTurn?: (user: AuthUser) => Promise<void>; // runs once per request before any LLM call; throws ChatError to refuse (the daily cap)
 }
 
 export interface ChatInput {
@@ -100,6 +101,8 @@ export class ChatAgent {
     if (this.inFlight.has(userId)) throw new ChatError(429, "chat busy: wait for the previous reply");
     this.inFlight.add(userId);
     try {
+      // After the busy check, so a refused-as-busy request spends no turn; before runTurn, so a capped confirm keeps its pending entry.
+      await this.options.beforeTurn?.(input.user);
       return await this.runTurn(input);
     } finally {
       this.inFlight.delete(userId);

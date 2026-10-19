@@ -7,7 +7,6 @@ export const SESSION_SECONDS = 12 * 60 * 60;
 
 // The token goes in the cookie; only its hash is stored, like API keys.
 export async function createSession(pool: pg.Pool, userId: number): Promise<string> {
-  await pool.query("DELETE FROM sessions WHERE expires_at < now()");
   const token = randomBytes(32).toString("base64url");
   await pool.query("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(secs => $3))", [hashKey(token), userId, SESSION_SECONDS]);
   return token;
@@ -25,6 +24,12 @@ export async function findSessionUser(pool: pg.Pool, token: string): Promise<Aut
 
 export async function deleteSession(pool: pg.Pool, token: string): Promise<void> {
   await pool.query("DELETE FROM sessions WHERE token_hash = $1", [hashKey(token)]);
+}
+
+// Expired rows are already rejected by findSessionUser; this only keeps the table small. Run hourly from app.sweep.
+export async function deleteExpiredSessions(pool: pg.Pool): Promise<number> {
+  const { rowCount } = await pool.query("DELETE FROM sessions WHERE expires_at < now()");
+  return rowCount ?? 0;
 }
 
 export async function deleteUserSessions(pool: pg.Pool, userId: number): Promise<void> {

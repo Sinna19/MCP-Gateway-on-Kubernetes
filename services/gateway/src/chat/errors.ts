@@ -3,6 +3,7 @@ export class ChatError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly retryAfterSeconds?: number, // sent as Retry-After on a 429
   ) {
     super(message);
   }

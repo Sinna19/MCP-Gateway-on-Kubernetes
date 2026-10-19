@@ -121,7 +121,7 @@ describe("/api login rate limit", () => {
   });
 
   async function start(loginPerEmail: number, loginPerIp: number): Promise<void> {
-    server = await startServer(pool, undefined, { limits: { loginPerEmail, loginPerIp, loginWindowMs: 900_000, mcpCallsPerMinute: 60 } });
+    server = await startServer(pool, undefined, { limits: { loginPerEmail, loginPerIp, loginWindowMs: 900_000, mcpCallsPerMinute: 60, mcpSessionsPerKey: 10, chatDailyCap: 200 } });
     base = server.base;
   }
   const attempt = (email: string, password = WRONG_PASSWORD, headers?: Record<string, string>) => call(base, "/auth/login", { body: { email, password }, headers });

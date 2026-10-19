@@ -109,6 +109,10 @@ spec:
               value: {{ .Values.limits.login.windowSeconds | quote }}
             - name: MCP_CALLS_PER_MINUTE
               value: {{ .Values.limits.mcp.callsPerMinute | quote }}
+            - name: MCP_SESSIONS_PER_KEY
+              value: {{ .Values.limits.mcp.sessionsPerKey | quote }}
+            - name: CHAT_DAILY_CAP
+              value: {{ .Values.limits.chat.dailyCap | quote }}
           # Room for migrate() and bootstrap on first start (up to 60s) before liveness takes over.
           startupProbe:
             httpGet:

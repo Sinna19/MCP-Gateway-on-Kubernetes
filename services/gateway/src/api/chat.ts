@@ -44,6 +44,7 @@ export function chatRoutes(agent: ChatAgent | null): Router {
     } catch (err) {
       if (err instanceof ChatError) {
         log(err.status, 0, [], false);
+        if (err.retryAfterSeconds !== undefined) res.setHeader("Retry-After", String(err.retryAfterSeconds));
         res.status(err.status).json({ error: err.message });
         return;
       }

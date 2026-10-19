@@ -50,14 +50,15 @@ describe("loadConfig", () => {
     expect([...tools]).toEqual(["woo__list_orders", "fx__list_rates"]);
   });
   it("reads the rate limits, with defaults well above what dod-check uses", () => {
-    expect(loadConfig(valid).limits).toEqual({ loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 60 });
-    const env = { ...valid, LOGIN_LIMIT_PER_EMAIL: "3", LOGIN_LIMIT_PER_IP: "10", LOGIN_LIMIT_WINDOW_SECONDS: "60", MCP_CALLS_PER_MINUTE: "5" };
-    expect(loadConfig(env).limits).toEqual({ loginPerEmail: 3, loginPerIp: 10, loginWindowMs: 60_000, mcpCallsPerMinute: 5 });
+    expect(loadConfig(valid).limits).toEqual({ loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 60, mcpSessionsPerKey: 10, chatDailyCap: 200 });
+    const env = { ...valid, LOGIN_LIMIT_PER_EMAIL: "3", LOGIN_LIMIT_PER_IP: "10", LOGIN_LIMIT_WINDOW_SECONDS: "60", MCP_CALLS_PER_MINUTE: "5", MCP_SESSIONS_PER_KEY: "2", CHAT_DAILY_CAP: "7" };
+    expect(loadConfig(env).limits).toEqual({ loginPerEmail: 3, loginPerIp: 10, loginWindowMs: 60_000, mcpCallsPerMinute: 5, mcpSessionsPerKey: 2, chatDailyCap: 7 });
     // the chart renders empty strings for unset values
-    expect(loadConfig({ ...valid, MCP_CALLS_PER_MINUTE: "" }).limits.mcpCallsPerMinute).toBe(60);
+    expect(loadConfig({ ...valid, MCP_CALLS_PER_MINUTE: "", MCP_SESSIONS_PER_KEY: "", CHAT_DAILY_CAP: "" }).limits).toMatchObject({ mcpCallsPerMinute: 60, mcpSessionsPerKey: 10, chatDailyCap: 200 });
   });
   it("rejects a limit that is not a positive whole number", () => {
-    for (const bad of ["0", "-1", "abc", "1.5"]) expect(() => loadConfig({ ...valid, MCP_CALLS_PER_MINUTE: bad })).toThrow("MCP_CALLS_PER_MINUTE");
+    for (const name of ["MCP_CALLS_PER_MINUTE", "MCP_SESSIONS_PER_KEY", "CHAT_DAILY_CAP"])
+      for (const bad of ["0", "-1", "abc", "1.5"]) expect(() => loadConfig({ ...valid, [name]: bad })).toThrow(name);
   });
   it("rejects a credentials key that is not 32 bytes", () => {
     expect(() => loadConfig({ ...valid, CREDENTIALS_KEY: Buffer.from("short").toString("base64") })).toThrow("CREDENTIALS_KEY must be 32 bytes");

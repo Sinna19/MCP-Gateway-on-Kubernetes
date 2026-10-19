@@ -39,6 +39,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       loginPerIp: positiveInt(env, "LOGIN_LIMIT_PER_IP", DEFAULT_LIMITS.loginPerIp),
       loginWindowMs: positiveInt(env, "LOGIN_LIMIT_WINDOW_SECONDS", DEFAULT_LIMITS.loginWindowMs / 1000) * 1000,
       mcpCallsPerMinute: positiveInt(env, "MCP_CALLS_PER_MINUTE", DEFAULT_LIMITS.mcpCallsPerMinute),
+      mcpSessionsPerKey: positiveInt(env, "MCP_SESSIONS_PER_KEY", DEFAULT_LIMITS.mcpSessionsPerKey),
+      chatDailyCap: positiveInt(env, "CHAT_DAILY_CAP", DEFAULT_LIMITS.chatDailyCap),
     },
   };
 }

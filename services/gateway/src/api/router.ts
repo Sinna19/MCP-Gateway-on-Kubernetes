@@ -9,6 +9,7 @@ import { keyRoutes } from "./keys.js";
 import { memberRoutes } from "./members.js";
 import { loadUser, requireJsonBody } from "./middleware.js";
 import { serverRoutes } from "./servers.js";
+import type { KeyUsage } from "../api-keys.js";
 import type { ChatAgent } from "../chat/agent.js";
 import type { UpstreamControl } from "../upstreams.js";
 
@@ -21,6 +22,7 @@ export interface ApiOptions {
   chat: ChatAgent | null;
   login: LoginLimiters;
   sessions: SessionControl; // ends open /mcp sessions when access changes
+  keyUsage: KeyUsage; // revoking a key forgets its last_used_at throttle entry
 }
 
 // Which /mcp sessions to end: the ones opened with one key, or all of one user's.
@@ -30,7 +32,7 @@ export interface SessionControl {
 }
 
 // Everything under /api: JSON only, session cookie auth, one error handler at the end.
-export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure, allowLoopback, chat, login, sessions }: ApiOptions): Router {
+export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure, allowLoopback, chat, login, sessions, keyUsage }: ApiOptions): Router {
   const router = Router();
   router.use(requireJsonBody);
   // Chat has its own, smaller cap. body-parser skips a body that is already parsed, so this must come first.
@@ -39,7 +41,7 @@ export function createApiRouter({ pool, upstreams, credentialsKey, cookieSecure,
   router.use(authRoutes(pool, cookieSecure, login));
   router.use(inviteRoutes(pool, cookieSecure));
   router.use(memberRoutes(pool, sessions));
-  router.use(keyRoutes(pool, sessions));
+  router.use(keyRoutes(pool, sessions, keyUsage));
   router.use(auditRoutes(pool));
   router.use(serverRoutes(pool, upstreams, credentialsKey, allowLoopback));
   router.use(chatRoutes(chat));

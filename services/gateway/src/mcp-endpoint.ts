@@ -4,9 +4,12 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, isInitializeRequest, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Router, type Request, type RequestHandler, type Response } from "express";
 import type pg from "pg";
-import { findUserByKey, hashKey, type AuthUser } from "./api-keys.js";
+import { findUserByKey, hashKey, type AuthUser, type KeyUsage } from "./api-keys.js";
 import type { Gateway } from "./gateway.js";
 import { FixedWindowLimiter } from "./rate-limit.js";
+
+// A client that sent `initialize` but never `notifications/initialized` is dropped after this long.
+const HANDSHAKE_MS = 60_000;
 
 interface Session {
   server: Server;
@@ -14,6 +17,8 @@ interface Session {
   keyHash: string;
   userId: number;
   lastActive: number;
+  createdAt: number;
+  initialized: boolean; // the client finished the handshake
 }
 
 export interface McpEndpointOptions {
@@ -22,6 +27,8 @@ export interface McpEndpointOptions {
   idleMs: number;
   now: () => number;
   callsPerMinute: number; // tools/call per API key
+  sessionsPerKey: number; // open sessions per API key
+  keyUsage: KeyUsage; // throttles the last_used_at write
 }
 
 function rpcError(res: Response, status: number, code: number, message: string, id: unknown = null): void {
@@ -37,7 +44,7 @@ function toolCallsIn(body: unknown): number {
 // The aggregated MCP endpoint. Stateful: one MCP Server per session so we can push tools/list_changed.
 // This keeps sessions in memory, so the gateway runs as a single replica (ADR 006).
 export function createMcpEndpoint(options: McpEndpointOptions) {
-  const { pool, gateway, idleMs, now } = options;
+  const { pool, gateway, idleMs, now, keyUsage } = options;
   const sessions = new Map<string, Session>();
   // In memory, so per process: fine with one replica, resets on restart (ADR 020).
   const callLimiter = new FixedWindowLimiter(options.callsPerMinute, 60_000, now);
@@ -56,9 +63,14 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: randomUUID,
       onsessioninitialized: (id: string) => {
-        sessions.set(id, { server, transport, keyHash, userId: Number(user.id), lastActive: now() });
+        sessions.set(id, { server, transport, keyHash, userId: Number(user.id), lastActive: now(), createdAt: now(), initialized: false });
       },
     });
+    // Fires when the client sends notifications/initialized, the second half of the handshake.
+    server.oninitialized = () => {
+      const session = transport.sessionId ? sessions.get(transport.sessionId) : undefined;
+      if (session) session.initialized = true;
+    };
     transport.onclose = () => {
       if (transport.sessionId) closeSession(transport.sessionId);
     };
@@ -69,7 +81,7 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
   // Runs on every request, so a revoked key stops working at once, even inside an open session.
   const authenticate: RequestHandler = async (req, res, next) => {
     const match = /^Bearer (\S+)$/.exec(req.headers.authorization ?? "");
-    const user = match?.[1] ? await findUserByKey(pool, match[1]) : null;
+    const user = match?.[1] ? await findUserByKey(pool, match[1], keyUsage) : null;
     if (!match?.[1] || !user) {
       res.setHeader("WWW-Authenticate", "Bearer");
       res.status(401).json({ error: "invalid or missing API key" });
@@ -102,6 +114,12 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
       return;
     }
     if (req.method === "POST" && isInitializeRequest(req.body)) {
+      // Over the cap the new client is refused; nobody else's session is evicted.
+      let open = 0;
+      for (const s of sessions.values()) if (s.keyHash === keyHash) open++;
+      if (open >= options.sessionsPerKey) {
+        return rpcError(res, 429, -32000, `too many open sessions for this key (${options.sessionsPerKey}), close one with DELETE /mcp`, (req.body as { id?: unknown }).id ?? null);
+      }
       await newSession(user, keyHash).handleRequest(req, res, req.body);
       return;
     }
@@ -128,7 +146,11 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
       for (const { server } of sessions.values()) void server.sendToolListChanged().catch(() => undefined);
     },
     sweep: () => {
-      for (const [id, session] of sessions) if (now() - session.lastActive > idleMs) closeSession(id);
+      for (const [id, session] of sessions) {
+        const idle = now() - session.lastActive > idleMs;
+        const neverFinishedHandshake = !session.initialized && now() - session.createdAt > HANDSHAKE_MS;
+        if (idle || neverFinishedHandshake) closeSession(id);
+      }
       callLimiter.sweep();
     },
     // Called by the dashboard API when a key is revoked, a user is disabled or a role changes:

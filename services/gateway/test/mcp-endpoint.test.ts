@@ -58,7 +58,7 @@ describe("/mcp endpoint", () => {
     const credentialsKey = randomBytes(32);
     manager = new UpstreamManager({ pool, credentialsKey, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300, allowLoopback: true });
     await manager.reload();
-    app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000, limits: { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 3 } });
+    app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000, limits: { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 3, mcpSessionsPerKey: 2, chatDailyCap: 200 } });
     http = await new Promise<Server>((resolve) => {
       const s = app.express.listen(0, "127.0.0.1", () => resolve(s));
     });
@@ -194,8 +194,20 @@ describe("/mcp endpoint", () => {
     expect(app.sessionCount()).toBe(0);
   });
 
+  // The second half of the handshake. A client that never sends it is dropped by the sweep after 60s.
+  const sendInitialized = (key: string, sessionId: string) =>
+    fetch(base, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}`, "mcp-session-id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    }).then(async (res) => {
+      await res.text();
+      return res;
+    });
+
   it("closes sessions idle for more than 30 minutes", async () => {
     const sessionId = await rawInitialize(alice.key);
+    await sendInitialized(alice.key, sessionId);
     expect(app.sessionCount()).toBe(1);
     clock += 29 * 60_000;
     app.sweep();
@@ -204,6 +216,51 @@ describe("/mcp endpoint", () => {
     app.sweep();
     expect(app.sessionCount()).toBe(0);
     expect((await listRequest(alice.key, sessionId)).status).toBe(404);
+  });
+
+  const initializeRaw = (key: string) => fetch(base, { method: "POST", headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}` }, body: JSON.stringify(INITIALIZE) });
+
+  it("caps open sessions per key (2 in this suite): the next initialize gets 429 + a JSON-RPC error, nobody is evicted", async () => {
+    const a = await rawInitialize(alice.key);
+    const b = await rawInitialize(alice.key);
+    const res = await initializeRaw(alice.key);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ jsonrpc: "2.0", error: { code: -32000, message: expect.stringContaining("too many open sessions") } });
+    expect(app.sessionCount()).toBe(2);
+    expect((await listRequest(alice.key, a)).status).toBe(200); // both earlier sessions still work
+    expect((await listRequest(alice.key, b)).status).toBe(200);
+  });
+
+  it("counts sessions per key: another key can still open one, and closing one frees a slot", async () => {
+    const a = await rawInitialize(alice.key);
+    await rawInitialize(alice.key);
+    expect((await initializeRaw(bob.key)).status).toBe(200);
+    expect((await initializeRaw(alice.key)).status).toBe(429);
+    await fetch(base, { method: "DELETE", headers: { Authorization: `Bearer ${alice.key}`, "mcp-session-id": a } });
+    expect((await initializeRaw(alice.key)).status).toBe(200);
+  });
+
+  it("drops a session whose initialize never completed after 60s, but keeps a completed one", async () => {
+    const half = await rawInitialize(alice.key); // never sends notifications/initialized
+    const full = await rawInitialize(bob.key);
+    expect((await sendInitialized(bob.key, full)).status).toBeLessThan(300);
+    clock += 50_000;
+    app.sweep();
+    expect(app.sessionCount()).toBe(2); // still within the 60s grace
+    clock += 11_000;
+    app.sweep();
+    expect(app.sessionCount()).toBe(1);
+    expect((await listRequest(alice.key, half)).status).toBe(404);
+    expect((await listRequest(bob.key, full)).status).toBe(200);
+  });
+
+  it("frees the cap once a failed initialize is swept", async () => {
+    await rawInitialize(alice.key);
+    await rawInitialize(alice.key);
+    expect((await initializeRaw(alice.key)).status).toBe(429);
+    clock += 61_000;
+    app.sweep();
+    expect((await initializeRaw(alice.key)).status).toBe(200);
   });
 
   const callRequest = (key: string, sessionId: string, name = "fx__does_not_exist") =>
