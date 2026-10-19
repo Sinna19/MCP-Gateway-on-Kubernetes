@@ -1,21 +1,20 @@
 # Handoff
-- **Done this session (7c part 2, code only):**
-  - 2ed3c8f feat(gateway): daily chat cap (`chat_usage`, migration 004, `chat/daily-cap.ts`, agent `beforeTurn` hook, 429 + Retry-After), `/mcp` session cap per key (default 10, 429 + JSON-RPC, no eviction), sessions that never send `notifications/initialized` closed by the 60s sweep, hourly purge of expired `sessions` and old `chat_usage` in `app.sweep`, `last_used_at` written at most once a minute per key (`KeyUsage`, per app). Dashboard shows the gateway's 429 text.
-  - Chart: `limits.mcp.sessionsPerKey` (10), `limits.chat.dailyCap` (200) in values + env in `deployment.yaml`.
-  - `make lint` clean; gateway 296 tests and dashboard tests pass (dashboard chat test updated for the 429 text).
-  - `make deploy` done; gateway rolled out Ready (1/1), logs show "gateway listening on :8080". No cluster checks run yet, by decision.
-- **In progress (uncommitted in the working tree):** edits to `docs/decisions/020-gateway-rate-limits.md` (four part 2 decisions + trade-offs) and `.claude/rules/gateway.md` (limits line). Review them, commit after the cluster checks. PLAN 7c boxes 4 to 7 are NOT ticked yet.
-- **Next step:** `7 7c cluster checks and close-out for part 2`: run the checks below, `make dod`, then tick the four 7c boxes in `docs/PLAN.md`, commit ADR/rules/PLAN.
-  - Chat cap: `helm upgrade platform charts/platform -n urumi --reuse-values --set gateway.limits.chat.dailyCap=1`, admin cookie via curl, 2x `POST /api/chat` gives 200 then 429 + Retry-After, psql `SELECT * FROM chat_usage`; revert with `make deploy` and confirm env `CHAT_DAILY_CAP=200`.
-  - Session cap: fresh member key, 11 initializes gives 10x200 then 429; revoke the key and show sessions closed.
-  - Expired sessions: insert an expired row in `sessions`, restart gateway, see `swept 1 expired sessions` in the log after about 60s.
-  - `last_used_at`: two `/mcp` requests 5s apart, value unchanged in psql.
-  - `make dod` 8/8 (restart gateway first if login tests ran).
+- **Done this session (7c part 2 verify, no code changed):**
+  - Chat cap: `dailyCap=1` gave 200 then 429 + `Retry-After: 58875`, `chat_usage` row count=1; `make deploy` reverted, env `CHAT_DAILY_CAP=200`.
+  - Session cap: member key, 10 initializes 200, 11th 429 with JSON-RPC body (`-32000`, "too many open sessions for this key (10)").
+  - Revoke closes sessions: an open SSE stream ended 3s in (right when the key was revoked), well before its 25s curl timeout.
+  - Expired sweep: inserted an expired `sessions` row, restarted, log `swept 1 expired sessions`, row gone.
+  - `last_used_at`: two `/mcp` requests 5s apart left it unchanged in psql.
+  - `make dod` 8/8 after a gateway restart.
+  - a6c6dc7 docs(adr): ADR 020 part 2 decisions, rules limits line, 7c boxes ticked. 7c is complete.
+- **In progress:** nothing.
+- **Next step:** `7 7d upstream and audit fixes` (first group: woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401).
 - **Gotchas learned:**
-  - Image tags are tree hashes: commit service changes before `make deploy`, or the pod keeps the old image.
-  - pg returns bigint ids as strings: `KeyUsage` is keyed by `Number(id)`; `createKey` returns a string id in tests.
-  - Existing `/mcp` tests that advance the clock must send `notifications/initialized`, or the new handshake sweep closes the session.
-  - Cap check order: busy check, then cap (inside `ChatAgent.run`). A confirm with an unknown id or a bad history still spends a turn (in ADR trade-offs).
+  - A 401 after revoking a key only proves the per-request revocation check. To prove sessions are closed, hold an SSE stream (`GET /mcp` with `Mcp-Session-Id`) open and revoke: it ends at once.
+  - `swept N expired sessions` is logged by the first sweep tick, about 60s after a restart; wait with an `until ... grep -q swept` loop, `sleep` chains are blocked.
+  - Secret `dod-member` has only a `password` key (user `dod-member@example.com`); admin login is in Secret `gateway-app` (`admin-email`, `admin-password`).
+  - psql in the pod: `kubectl -n urumi exec gateway-postgres-0 -- sh -c 'psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-$POSTGRES_USER}" -c "..."'`.
+  - Image tags are tree hashes: commit service changes before `make deploy`.
   - `make lint && make test` takes over 2 min; use `run_in_background`.
   - Parked: audit `args` and declined rows (7d); weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
-- **Files the next task needs:** `docs/PLAN.md` (7c), `docs/decisions/020-gateway-rate-limits.md`, `scripts/dod-check.sh`, `charts/gateway/values.yaml`, `deploy/values-local.yaml`.
+- **Files the next task needs:** `docs/PLAN.md` (7d), `services/woo-mcp/` (Woo auth code), `charts/woo-mcp/` templates and values, `.claude/rules/` for charts and the store.
