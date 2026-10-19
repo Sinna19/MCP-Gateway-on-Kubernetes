@@ -108,7 +108,7 @@ In this order:
 - [x] woo-mcp reads the Woo password from a mounted Secret file and re-reads it on a 401, so a regenerated password needs no restart
 - [x] woo-mcp requires a bearer token, sent by the gateway as an upstream credential (hop token; was optional, now required)
 - [x] fx-mcp and notes-mcp log one line on 401 (never the key)
-- [x] Audit: record tool args (size-capped, never secrets) and declined chat confirms as rows (verified on cluster; dashboard Audit page eyeball check still to do by hand)
+- [x] Audit: record tool args (size-capped, never secrets) and declined chat confirms as rows
 - **Accept:** regenerated Woo password works without restart; woo-mcp rejects calls without the token; audit shows args and declined confirms; `scripts/dod-check.sh` rerun.
 
 ### 7e Tool permissions per role (stand-out #2)

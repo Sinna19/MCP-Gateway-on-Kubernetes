@@ -6,8 +6,8 @@
   - Unauthenticated POST from gateway pod: fx-mcp and notes-mcp each 401 with one `rejected ...` line, no secret.
   - Gateway restarted, `make dod` 8/8.
   - 8d87cd8 docs(plan): 7d part 2 verified on cluster (removed "cluster check pending").
-- **In progress:** nothing. Not done: check 4, the dashboard Audit page in a browser (no browser tool available to me). Needs a manual look: Args `<details>` collapsed, declined filter works. Noted in `docs/PLAN.md:111`.
-- **Next step:** `7e` (see PLAN 7e). First eyeball the Audit page by hand and delete the note at PLAN.md:111.
+- **In progress:** nothing. Dashboard Audit page checked by hand (Args collapsed, declined filter works).
+- **Next step:** `7e` (see PLAN 7e).
 - **Gotchas learned:**
   - A throwaway verify script that reuses the `scripts/dod-check.sh` helpers (api/login/new_key/mcp_*) works well: extract with `sed -n '/^api() {/,/^# ---- wait loop/p'`, not fixed line numbers (cut a function in half once).
   - Chat body is `{messages:[{role,content}]}`; the decline is the same `messages` plus `confirm:{id,approve:false}`; pending id is in `pendingToolCall.id`.
