@@ -1,16 +1,19 @@
 # Handoff
-- **Done this session (7d part 2 verify, no code changes):**
-  - `make images && make deploy`: migration 005 ran (`\d audit_log` shows `args jsonb`, outcome check includes `declined`).
-  - MCP `fx__convert_currency` with extra `token` field: outcome `ok`, audit args show `"token":"[redacted]"`.
-  - Chat write request then decline: `/api/audit?outcome=declined&limit=1` shows source `chat` + args; woo-mcp log has 0 create_product lines.
-  - Unauthenticated POST from gateway pod: fx-mcp and notes-mcp each 401 with one `rejected ...` line, no secret.
-  - Gateway restarted, `make dod` 8/8.
-  - 8d87cd8 docs(plan): 7d part 2 verified on cluster (removed "cluster check pending").
-- **In progress:** nothing. Dashboard Audit page checked by hand (Args collapsed, declined filter works).
-- **Next step:** `7e` (see PLAN 7e).
+- **Done this session (7e code, not yet on the cluster):**
+  - 15a2715 feat(gateway): migration 006 `tool_rules`; `Gateway.restrictedFor/listTools(user)/callTool` is the one check (role read per request); restricted call throws `McpError` "tool not permitted for your role" after an `error` audit row; chat agent catches it as a tool message; `PATCH /api/servers/:slug/tools/:tool` upserts a rule, replies `{tool, adminOnly, listed}` and sends list_changed; `serverView` hides restricted tools from members, gives admins `adminOnly` + `toolRules`; woo write tools seeded in migration, `bootstrap` and `scripts/register-upstreams.sh` (insert-if-missing). 334 tests, `make lint` ok.
+  - aeb2193 feat(dashboard): "Admins only" checkbox per tool on the Servers page.
+  - ab0dde8 docs(adr): 022 (default-open stated plainly, default-closed is the hardening step) + a line in `.claude/rules/gateway.md`.
+- **In progress:** nothing in code. PLAN 7e boxes are NOT ticked yet (`docs/PLAN.md:115-117`): tick them after the cluster checks pass.
+- **Next step:** `7e verify` (cluster checks only, no new code).
+  - `make images && make deploy` (migration 006 runs). `\d tool_rules` and 2 rows for woo.
+  - Member key: `tools/list` has no `woo__create_product` / `woo__update_order_status`; direct call gives the JSON-RPC error; `/api/audit?outcome=error&limit=1` shows the row. Admin key lists and calls it.
+  - Chat as a member asking to change an order status: no `pendingToolCall`.
+  - Open member SSE session (curl GET), flip the toggle in the UI: `notifications/tools/list_changed` arrives.
+  - Delete woo, `make register`: both rules back; set one to false in the UI, `make register` leaves it false.
+  - `make dod` 8/8. Then tick 7e in PLAN and commit.
 - **Gotchas learned:**
-  - A throwaway verify script that reuses the `scripts/dod-check.sh` helpers (api/login/new_key/mcp_*) works well: extract with `sed -n '/^api() {/,/^# ---- wait loop/p'`, not fixed line numbers (cut a function in half once).
-  - Chat body is `{messages:[{role,content}]}`; the decline is the same `messages` plus `confirm:{id,approve:false}`; pending id is in `pendingToolCall.id`.
-  - fx/notes services listen on port 3000.
-  - Parked: weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
-- **Files the next task needs:** `docs/PLAN.md` (7e), `.claude/rules/gateway.md`, `scripts/dod-check.sh`.
+  - On `/mcp` the error text is `MCP error -32602: tool not permitted for your role` (the SDK prefixes `McpError` messages). The audit row has the plain text.
+  - `Gateway.listTools` is async and takes the user; anything that calls it needs the user to exist in `users` (a missing user counts as member).
+  - `register-upstreams.sh` reads `.toolRules` from the admin `/api/servers`; a stored rule with `false` counts as "set".
+  - No fake `SessionControl` in tests needed changing, but a new member was added to that interface (`notifyToolsChanged`).
+- **Files the next task needs:** `docs/PLAN.md` (7e), `scripts/dod-check.sh` (helpers api/login/new_key/mcp_*), `docs/decisions/022-tool-permissions-per-role.md`.
