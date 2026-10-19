@@ -95,9 +95,9 @@ Verify each with one blocked and one allowed curl (k3s rejects = exit 7; new pod
 
 ### 7c Gateway limits and cleanup
 In this order:
-- [ ] Revoking a key or disabling a user closes its open MCP sessions/SSE streams (ADR 014)
-- [ ] Login rate limiting on `POST /api/auth/login` (per IP + per email, 429)
-- [ ] Per-key rate limit on `/mcp` tool calls (429, configurable in values) (stand-out #7)
+- [x] Revoking a key or disabling a user (or changing their role) closes its open MCP sessions/SSE streams (ADR 014)
+- [x] Login rate limiting on `POST /api/auth/login` (per IP + per email, 429)
+- [x] Per-key rate limit on `/mcp` tool calls (429, configurable in values) (stand-out #7)
 - [ ] Per-user daily chat cap (Postgres counter, 429, configurable in values)
 - [ ] `/mcp` session cap per API key; sweep sessions whose `initialize` failed
 - [ ] Periodic expired-session sweep (Postgres sessions table)

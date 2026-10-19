@@ -17,8 +17,8 @@ Status: accepted. Dashboard only; no gateway change.
   - `<meta name="referrer" content="no-referrer">` in `index.html` so the token never leaves in a Referer header. The nginx task adds the matching `Referrer-Policy` header.
 - `GET /invites` (pending list) never returns the token or path; verified by grep on the live response.
 
-## Known gap (phase 7)
-Revoking a key rejects its next request, even inside an open `/mcp` session (verified: 401 on `tools/list`). The session object and any open SSE stream are not closed until the 30-minute idle timeout, so a revoked key may still receive `list_changed` notifications until then.
+## Known gap (phase 7): fixed in 7c, see ADR 020
+Revoking a key rejected its next request, even inside an open `/mcp` session (401 on `tools/list`), but the session object and any open SSE stream lived until the 30-minute idle timeout. Now revoke, disable and role change close the sessions at once.
 
 ## Known limitation: invite token in the URL path
 The invite link is `/invite/<token>`, so the token lands in gateway and Traefik access logs and in browser history. Mitigations: the token is single-use and expires, and `no-referrer` stops it leaking to other sites. Whoever can read those logs or history before the invitee accepts could accept first; recorded for THREAT_MODEL.md.
