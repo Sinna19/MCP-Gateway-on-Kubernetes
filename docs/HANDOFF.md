@@ -1,16 +1,17 @@
 # Handoff
 - **Done this session:**
-  - 1bed8cf feat(scripts): `scripts/dod-check.sh` (8 checks a-h: tools-all-enabled, calls-ok, audit-per-user, disable-hides-tools, register-keeps-disabled, dead-upstream-isolated, revoke-rejects, user-disable-rejects). PLAN 7a ticked.
-  - Two clean `make dod` runs on the cluster: 8 passed, 0 failed each. Post-run: notes replicas 1, fx/notes/woo enabled + connected, member B enabled with 0 active keys.
-  - A run makes 19 MCP requests, 12 on the busiest key (B's first). 7c's per-key rate limit default must stay above that.
-  - Quiz on the chat agent from the earlier session is still unanswered by Ash.
+  - a59c810 feat(charts): default-deny ingress (platform chart) plus per-workload policies for mariadb, wordpress, woo-mcp egress, gateway (ingress Traefik, egress DNS/postgres/upstreams/public 443), gateway-postgres egress, fx/notes egress, dashboard. `global.network` in `charts/platform/values.yaml` holds the Traefik/CoreDNS selectors and private ranges. ADR 019 written, ADR 009 updated. PLAN 7b ticked.
+  - Probes on the live cluster: every blocked case refused, every allowed case connected (MariaDB, WordPress, gateway, dashboard ingress; WordPress, woo-mcp, gateway, fx/notes, postgres, dashboard egress; gateway to the k8s API and WordPress refused). `make dod`: 8 passed, 0 failed. Probe pods deleted.
+  - Quiz on the chat agent from an earlier session is still unanswered by Ash.
 - **In progress:** nothing.
-- **Next step:** `7 7b NetworkPolicies`
+- **Next step:** `7 7c Gateway limits and cleanup` (start with the first checkbox: closing MCP sessions on key revoke / user disable, ADR 014).
 - **Gotchas learned:**
   - Docker Desktop must be running before any kubectl/k3d command; after a restart run `k3d cluster start urumi`.
-  - dod-check uses a fixed member `dod-member@example.com` (password in Secret `dod-member`, created on first run). Do not delete that Secret without also disabling the member; the login would no longer match.
-  - dod-check scales notes-mcp to 0 and disables fx while it runs; the EXIT trap restores both. If a run is killed hard (SIGKILL), check `kubectl -n urumi get deploy notes-mcp` and fx in the dashboard.
-  - Env knobs: `DOD_CONTEXT` (k3d-urumi), `DOD_WAIT` (60s), `NS`, `GATEWAY_URL`.
+  - Probe WordPress at `/wp-json/`, not `/`: `/` redirects to the public host (127.0.0.1 in a pod) and looks like a policy refusal.
+  - Subchart `helm lint` needs `-f charts/platform/values.yaml` (Makefile does this) because `global.network` is only defined there.
+  - `gateway.networkPolicy.upstreamPort` (3000) must equal `woo-mcp.port` and `upstreams.*.port`.
+  - Gateway egress is 443 only to public addresses: a public upstream on another port is blocked by design.
+  - dod-check uses fixed member `dod-member@example.com` (Secret `dod-member`); do not delete that Secret without disabling the member. It scales notes-mcp to 0 and disables fx while running (EXIT trap restores; after a SIGKILL check `kubectl -n urumi get deploy notes-mcp` and fx in the dashboard). Env knobs: `DOD_CONTEXT`, `DOD_WAIT`, `NS`, `GATEWAY_URL`. A run makes 19 MCP requests, 12 on the busiest key: 7c's per-key limit must stay above that.
   - Parked: audit `args` column and `declined` rows (7d); weak points in `docs/explain/chat-agent.md` section 14.
   - `make lint && make test` takes over 2 min; run with `run_in_background`.
-- **Files the next task needs:** `docs/PLAN.md` (7b section), `.claude/rules/kubernetes.md`, `charts/` NetworkPolicy templates (grep `kind: NetworkPolicy`), `deploy/values-local.yaml`, `scripts/dod-check.sh` (rerun only).
+- **Files the next task needs:** `docs/PLAN.md` (7c section), `docs/decisions/014-*.md`, `.claude/rules/gateway.md`, `services/gateway/src` (session handling, key revoke and user disable code; grep for them), `charts/gateway/values.yaml`.
