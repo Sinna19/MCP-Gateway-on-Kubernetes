@@ -1,19 +1,18 @@
 # Handoff
-- **Done this session (7e code, not yet on the cluster):**
-  - 15a2715 feat(gateway): migration 006 `tool_rules`; `Gateway.restrictedFor/listTools(user)/callTool` is the one check (role read per request); restricted call throws `McpError` "tool not permitted for your role" after an `error` audit row; chat agent catches it as a tool message; `PATCH /api/servers/:slug/tools/:tool` upserts a rule, replies `{tool, adminOnly, listed}` and sends list_changed; `serverView` hides restricted tools from members, gives admins `adminOnly` + `toolRules`; woo write tools seeded in migration, `bootstrap` and `scripts/register-upstreams.sh` (insert-if-missing). 334 tests, `make lint` ok.
-  - aeb2193 feat(dashboard): "Admins only" checkbox per tool on the Servers page.
-  - ab0dde8 docs(adr): 022 (default-open stated plainly, default-closed is the hardening step) + a line in `.claude/rules/gateway.md`.
-- **In progress:** nothing in code. PLAN 7e boxes are NOT ticked yet (`docs/PLAN.md:115-117`): tick them after the cluster checks pass.
-- **Next step:** `7e verify` (cluster checks only, no new code).
-  - `make images && make deploy` (migration 006 runs). `\d tool_rules` and 2 rows for woo.
-  - Member key: `tools/list` has no `woo__create_product` / `woo__update_order_status`; direct call gives the JSON-RPC error; `/api/audit?outcome=error&limit=1` shows the row. Admin key lists and calls it.
-  - Chat as a member asking to change an order status: no `pendingToolCall`.
-  - Open member SSE session (curl GET), flip the toggle in the UI: `notifications/tools/list_changed` arrives.
-  - Delete woo, `make register`: both rules back; set one to false in the UI, `make register` leaves it false.
-  - `make dod` 8/8. Then tick 7e in PLAN and commit.
+- **Done this session (7e verified on the cluster, no code changes):**
+  - 831b1d2 docs(plan): 7e ticked. Earlier 7e code: 15a2715 (gateway), aeb2193 (dashboard), ab0dde8 (ADR 022).
+  - `make images && make deploy && make register`: migration 006 ran, `tool_rules` has woo `create_product` and `update_order_status` = admin only.
+  - Member key: `tools/list` has no write tools; direct call gives `-32602 tool not permitted for your role`; audit row (outcome=error, source=mcp) shows it.
+  - Admin key lists both write tools and `woo__list_products` works (no product created).
+  - Member chat asking for an order status change: no `pendingToolCall`, no tool calls.
+  - Member SSE stream got `notifications/tools/list_changed` on PATCH `list_orders` true and again on false.
+  - `make register` twice leaves the rules unchanged. Gateway restarted, `make dod` 8/8 (first run 7/8, see gotchas).
+- **In progress:** nothing. Tree is clean after this commit.
+- **Next step:** `7 7f key rotation` (CREDENTIALS_KEY rotation script + ADR; image digest pinning or documented reason is the second 7f group, do it in a separate session). See `docs/PLAN.md` 7f.
 - **Gotchas learned:**
-  - On `/mcp` the error text is `MCP error -32602: tool not permitted for your role` (the SDK prefixes `McpError` messages). The audit row has the plain text.
-  - `Gateway.listTools` is async and takes the user; anything that calls it needs the user to exist in `users` (a missing user counts as member).
-  - `register-upstreams.sh` reads `.toolRules` from the admin `/api/servers`; a stored rule with `false` counts as "set".
-  - No fake `SessionControl` in tests needed changing, but a new member was added to that interface (`notifyToolsChanged`).
-- **Files the next task needs:** `docs/PLAN.md` (7e), `scripts/dod-check.sh` (helpers api/login/new_key/mcp_*), `docs/decisions/022-tool-permissions-per-role.md`.
+  - `make dod` check f failed once with `curl: (6) Could not resolve host: app.localtest.me` (local DNS blip); rerun passed. Check the curl error before suspecting the gateway.
+  - PATCHing a tool rule to `false` inserts a `tool_rules` row (`woo|list_orders|f`). Harmless, but the table then has 3 rows, not 2.
+  - This shell has no `pgrep`; a Monitor that greps the output file also matches earlier lines of it, so match a line only the final step prints.
+  - Postgres access: `kubectl -n urumi exec gateway-postgres-0 -- sh -c 'psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-$POSTGRES_USER}" ...'`; the table is `upstream_servers`, not `servers`.
+  - On `/mcp` the error text is `MCP error -32602: ...` (SDK prefix); the audit row has the plain text.
+- **Files the next task needs:** `docs/PLAN.md` (7f), `docs/decisions/` (next ADR number), `.claude/rules/gateway.md`, the gateway code that encrypts/decrypts upstream credentials (grep `CREDENTIALS_KEY` in `services/gateway/src` and `charts/`), `scripts/dod-check.sh`.
