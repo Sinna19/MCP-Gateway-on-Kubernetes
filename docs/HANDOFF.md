@@ -1,14 +1,20 @@
 # Handoff
-- **Done this session (7d part 1, woo-mcp):**
-  - 83861a1 feat(woo-mcp): password read from the mounted file `woo-api/password` on every request, one retry on a Woo 401 only if the file changed; `/mcp` needs a bearer token (`src/auth.ts`, constant-time); 401 logs one line without the token. Chart mounts the Secret (no subPath) and takes `WOO_MCP_TOKEN` from Secret `woo-mcp-token`; `secrets.sh` creates it if missing; `register-upstreams.sh` sets it on woo (no printing). 48 woo-mcp tests, `make lint`/`make test` ok.
-  - c154107 docs: ADR 021 (incl. token rotation), README quick start adds `make register`, store rules updated, 7d first two boxes ticked.
-  - Verified on the cluster: no token and wrong token both gave 401 (node fetch via `kubectl exec` in the gateway pod), woo-mcp log shows one line per rejection. Password regenerated (Secret hash changed, old app password deleted): same pod, RESTARTS 0, `readyz` 200 and `list_products` ok after kubelet synced the file. `make dod` 8/8.
+- **Done this session (7d part 2, code only):**
+  - ff53978 feat(upstreams): fx and notes log `rejected POST /mcp: missing or wrong bearer token` / `... x-notes-key header` on a 401 (no value). Tests spy `console.warn`.
+  - f0966da feat(gateway): migration `005_audit_args.sql` (nullable `args jsonb`, outcome check adds `declined`); `src/audit-args.ts` (`redact`, `auditArgs`, 2 KB cap gives `{_truncated:true,bytes}`); `Gateway.audit` is the one writer, `Gateway.recordDeclined` for chat declines (called in `chat/agent.ts` decline branch with the server-held args); `/api/audit` returns `args` and accepts `outcome=declined`.
+  - 8d1ce87 feat(dashboard): Args column (`<details>` closed, `<pre>` text), `declined` filter option.
+  - 215e8e8 docs: ADR 015 section "Args and declined confirms" (author/keyword/order_key over-redaction kept on purpose, customer data in args, admins see all, members their own incl. args), gateway rule line. 7d boxes ticked in PLAN with "cluster check pending".
+  - `make lint` and `make test` green. Cluster NOT touched this session.
 - **In progress:** nothing.
-- **Next step:** `7 7d upstream and audit fixes, part 2`: fx-mcp and notes-mcp log one line on 401 (never the key); audit records tool args (size-capped, never secrets) and declined chat confirms as rows. Then tick the last two 7d boxes.
+- **Next step: verify session for 7d part 2** (`/verify` or by hand): `make images && make deploy` (migration 005 runs on gateway start), then with the admin cookie via curl:
+  1. MCP: call `fx__convert_currency` through `/mcp` (umk key) with an extra `token` field, then `GET /api/audit?limit=1` shows args with `"token":"[redacted]"`. fx may reject the extra field by schema: then the row is outcome `error` but must still carry the redacted args. Report which outcome came back.
+  2. Chat: `POST /api/chat` asking for a write, then `{confirm:{id,approve:false}}`; `GET /api/audit?outcome=declined&limit=1` shows source `chat` with args; woo-mcp log shows no call.
+  3. 401 lines: unauthenticated POST to fx-mcp and notes-mcp from the gateway pod (node fetch via `kubectl exec`), then `kubectl logs deploy/<name> --tail=5 | grep rejected`.
+  4. `make dod` 8/8. If all pass, remove the "cluster check pending" notes in PLAN 7d and tick Accept.
 - **Gotchas learned:**
-  - Do not wait for the `woo password changed on disk; retrying` log line. The client reads the file on every request, so after kubelet swaps the file (up to ~90s) the next request already has the new password and never sees a 401. The line only appears if the file changes mid-request; the unit tests cover that. Prove it by `readyz` 200 plus a `list_products` call from inside the woo-mcp pod (node fetch with `process.env.WOO_MCP_TOKEN`), same pod name, RESTARTS 0.
-  - To force a password regeneration: `kubectl patch secret woo-api --type=json -p '[{"op":"remove","path":"/data/password"}]'`, then `make deploy` (new setup Job revision recreates it and deletes the old app password).
-  - A fresh cluster needs `make deploy` then `make register`, or woo is Unreachable (401). 7g's rehearsal must do both.
-  - `make lint && make test` is slow; background it and wait with an `until`-style loop on a `done` marker (stale `/tmp` files can mislead).
+  - The secret-guard hook blocks test literals like `token: "some-long-value"` (12+ chars): generate with `randomBytes` (as in `gateway.test.ts`).
+  - Passing `JSON.stringify(null)` to a jsonb param stores JSON null, not SQL NULL; `Gateway.audit` passes a real `null` for no args.
+  - Old tests asserted "args never stored" (`gateway.test.ts`, `mcp-endpoint.test.ts`); both rewritten for the new behaviour.
+  - `make lint && make test` is slow; background it and wait for the completion notification.
   - Parked: weak points in `docs/explain/chat-agent.md` section 14; unanswered chat agent quiz.
-- **Files the next task needs:** `docs/PLAN.md` (7d), `services/fx-mcp/src/server.ts`, `services/notes-mcp/src/` (auth check), `services/gateway/src/` audit writer and chat confirm path, `.claude/rules/gateway.md`.
+- **Files the next task needs:** `docs/PLAN.md` (7d accept, then 7e), `scripts/dod-check.sh`, `.claude/rules/gateway.md`.
