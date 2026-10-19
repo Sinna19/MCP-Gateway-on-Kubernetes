@@ -1,17 +1,17 @@
 # Handoff
-- **Done this session:**
-  - a59c810 feat(charts): default-deny ingress (platform chart) plus per-workload policies for mariadb, wordpress, woo-mcp egress, gateway (ingress Traefik, egress DNS/postgres/upstreams/public 443), gateway-postgres egress, fx/notes egress, dashboard. `global.network` in `charts/platform/values.yaml` holds the Traefik/CoreDNS selectors and private ranges. ADR 019 written, ADR 009 updated. PLAN 7b ticked.
-  - Probes on the live cluster: every blocked case refused, every allowed case connected (MariaDB, WordPress, gateway, dashboard ingress; WordPress, woo-mcp, gateway, fx/notes, postgres, dashboard egress; gateway to the k8s API and WordPress refused). `make dod`: 8 passed, 0 failed. Probe pods deleted.
+- **Done this session (7c part 1):**
+  - ca1b681 feat(gateway): revoke key / disable user / role change close the user's `/mcp` sessions and SSE streams; login rate limit (IP 30 + email 5 per 15 min, 429 + Retry-After); per-key `/mcp` `tools/call` limit (60/min). Limiter is `src/rate-limit.ts`; limits in `charts/gateway/values.yaml` `limits:`.
+  - 22b5d33 docs: ADR 020, ADR 014 gap closed, gateway rules, PLAN first three 7c boxes ticked.
+  - Cluster proof: 32 logins with distinct emails + spoofed XFF hit 429 after 30 (Traefik overwrites XFF); 6th wrong login for one email 429; 61 `fx__does_not_exist` calls gave 60x200 then 429 Retry-After; revoke ended a running SSE curl. `make lint`, `make test` (275), `make dod` 8/8.
   - Quiz on the chat agent from an earlier session is still unanswered by Ash.
 - **In progress:** nothing.
-- **Next step:** `7 7c Gateway limits and cleanup` (start with the first checkbox: closing MCP sessions on key revoke / user disable, ADR 014).
+- **Next step:** `7 7c Gateway limits and cleanup, part 2`: per-user daily chat cap, `/mcp` session cap per key + sweep failed-initialize sessions, expired-session sweep (Postgres `sessions`), throttle `api_keys.last_used_at` to once a minute. Reuse `FixedWindowLimiter` only where in-memory fits; the chat cap is a Postgres counter by plan.
 - **Gotchas learned:**
-  - Docker Desktop must be running before any kubectl/k3d command; after a restart run `k3d cluster start urumi`.
-  - Probe WordPress at `/wp-json/`, not `/`: `/` redirects to the public host (127.0.0.1 in a pod) and looks like a policy refusal.
-  - Subchart `helm lint` needs `-f charts/platform/values.yaml` (Makefile does this) because `global.network` is only defined there.
-  - `gateway.networkPolicy.upstreamPort` (3000) must equal `woo-mcp.port` and `upstreams.*.port`.
-  - Gateway egress is 443 only to public addresses: a public upstream on another port is blocked by design.
-  - dod-check uses fixed member `dod-member@example.com` (Secret `dod-member`); do not delete that Secret without disabling the member. It scales notes-mcp to 0 and disables fx while running (EXIT trap restores; after a SIGKILL check `kubectl -n urumi get deploy notes-mcp` and fx in the dashboard). Env knobs: `DOD_CONTEXT`, `DOD_WAIT`, `NS`, `GATEWAY_URL`. A run makes 19 MCP requests, 12 on the busiest key: 7c's per-key limit must stay above that.
+  - Cluster login tests share one source IP (k3d): 30 failed logins lock it for 15 min. Reset with `kubectl -n urumi rollout restart deploy/gateway` (limiter is in memory). Do not run the XFF spray test right before `make dod` without restarting.
+  - A 429 from the per-email bucket does not prove XFF is overwritten; use many distinct emails against the IP limit.
+  - `findUserByKey` writes `last_used_at` on every request (the part 2 throttle goes there, `src/api-keys.ts`).
+  - Docker Desktop must be running before kubectl/k3d; after a restart `k3d cluster start urumi`.
+  - dod-check uses member `dod-member@example.com` (Secret `dod-member`); 19 MCP requests, 12 on the busiest key, well under 60/min.
   - Parked: audit `args` column and `declined` rows (7d); weak points in `docs/explain/chat-agent.md` section 14.
   - `make lint && make test` takes over 2 min; run with `run_in_background`.
-- **Files the next task needs:** `docs/PLAN.md` (7c section), `docs/decisions/014-*.md`, `.claude/rules/gateway.md`, `services/gateway/src` (session handling, key revoke and user disable code; grep for them), `charts/gateway/values.yaml`.
+- **Files the next task needs:** `docs/PLAN.md` (7c), `docs/decisions/020-gateway-rate-limits.md`, `.claude/rules/gateway.md`, `services/gateway/src/{mcp-endpoint,api-keys,sessions,app,config,index}.ts`, `src/api/chat.ts`, `src/chat/agent.ts`, `charts/gateway/values.yaml`.
