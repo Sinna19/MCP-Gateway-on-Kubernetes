@@ -19,6 +19,14 @@
   7. Only then delete `gateway-key-old`, `gateway-key-new` and the Job.
 - **Failure after the commit.** The EXIT trap always scales the gateway back to 1 except in one case. If the Job committed but the swap of `gateway-app` failed, the trap retries the swap once. If that works, the gateway starts on the new key. If it fails again the database holds the new key and `gateway-app` the old one, so starting the gateway would be wrong; the gateway stays at 0 and the script prints: `DB uses the new key (Secret gateway-key-new). Run: scripts/rotate-credentials-key.sh finish, then scale gateway to 1`. `finish` only copies `gateway-key-new` into `gateway-app`. `gateway-key-new` is kept in every path until the success step; if the servers do not connect after the swap, the old key also stays in `gateway-key-old`.
 
+## Recovery
+| Where it stopped | State | What to do |
+|---|---|---|
+| Before the Job commits (Job failed, rolled back) | Database and `gateway-app` on the old key | Nothing. The trap scales the gateway back up and deletes both temp Secrets. |
+| Job committed, swap failed twice | Database on the new key, `gateway-app` on the old, gateway at 0 | `scripts/rotate-credentials-key.sh finish` (copies `gateway-key-new` into `gateway-app`), then `kubectl -n urumi scale deploy/gateway --replicas=1`, then delete `gateway-key-old` and `gateway-key-new` once servers are connected. |
+| Swap done, servers not connected in time | Both on the new key, gateway running | Read `kubectl -n urumi logs deploy/gateway --tail=30`. Both key Secrets are kept until you delete them. |
+| Any later run says a `gateway-key-*` Secret exists | An earlier run did not finish | The script refuses and prints which of the two cases above applies. |
+
 ## Downtime
 The gateway is down from step 3 to step 6, about 30 s locally (Job plus pod start). Open `/mcp` sessions and chat turns are cut and clients reconnect. Rotation is rare, so we accept it instead of building a gateway that holds two keys.
 
