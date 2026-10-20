@@ -78,8 +78,13 @@ fi
 if kubectl -n "$NS" get secret woo-mcp-token >/dev/null 2>&1; then
   echo "secret woo-mcp-token: exists, skipped"
 else
+  # The token goes through a private temp file, not argv (a --from-literal value shows in the process list).
+  # cygpath -m: Windows kubectl cannot read a Git Bash /tmp path.
+  token_file="$(umask 077; mktemp)"
+  trap 'rm -f "$token_file"' EXIT
+  openssl rand -hex 32 | tr -d '\r\n' > "$token_file"
   kubectl -n "$NS" create secret generic woo-mcp-token \
-    --from-literal=token="$(openssl rand -hex 32)" >/dev/null
+    --from-file=token="$(cygpath -m "$token_file" 2>/dev/null || echo "$token_file")" >/dev/null
   echo "secret woo-mcp-token: created"
 fi
 
