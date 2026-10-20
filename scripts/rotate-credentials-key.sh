@@ -2,6 +2,7 @@
 # Rotates CREDENTIALS_KEY (ADR 023): re-encrypts every stored upstream credential under a new key.
 #   scripts/rotate-credentials-key.sh          full rotation (make rotate-key)
 #   scripts/rotate-credentials-key.sh finish   only copy Secret gateway-key-new into gateway-app (recovery, see below)
+#   scripts/rotate-credentials-key.sh prefixes print the stored ciphertext prefixes (recovery: did the Job commit?)
 # The gateway is DOWN from step 3 until it is back (about 30s). Rotation is rare, so that is accepted.
 # Keys live only in Secrets and in one private temp dir (removed on exit). Never in argv, stdin or output.
 set -euo pipefail
@@ -45,6 +46,12 @@ swap_key() {
   k patch secret gateway-app --type merge --patch-file "$(winpath "$TMP/patch.json")" >/dev/null
 }
 
+if [ "${1:-}" = prefixes ]; then
+  prefixes
+  rm -rf "$TMP"
+  exit 0
+fi
+
 if [ "${1:-}" = finish ]; then
   swap_key
   echo "gateway-app now holds the new key. Next: kubectl -n $NS scale deploy/gateway --replicas=1"
@@ -63,10 +70,24 @@ for s in gateway-key-old gateway-key-new; do
 done
 
 # ---- state read by the EXIT trap ----
-scaled_down=0 committed=0 swapped=0 done_ok=0
+scaled_down=0 committed=0 swapped=0 done_ok=0 unknown=0
 cleanup() {
   local rc=$?
   trap - EXIT
+  if [ "$unknown" = 1 ]; then
+    # The Job timed out: we do not know if it committed. Do NOT scale up on the old key and do NOT delete the backups.
+    cat >&2 <<MSG
+The re-encrypt Job timed out and was deleted. It may or may not have committed, so the gateway is kept at 0 replicas
+and Secrets gateway-key-old and gateway-key-new are kept. Find out which key the database uses:
+  scripts/rotate-credentials-key.sh prefixes     compare with the 'before' list printed above
+  - prefixes changed  -> the database is on the NEW key: scripts/rotate-credentials-key.sh finish
+  - prefixes the same -> the database is still on the OLD key (gateway-app is unchanged)
+Then: kubectl -n $NS scale deploy/gateway --replicas=1, check that the servers are connected
+(kubectl -n $NS logs deploy/gateway --tail=30), and delete the backups: kubectl -n $NS delete secret gateway-key-old gateway-key-new
+MSG
+    rm -rf "$TMP"
+    exit "$rc"
+  fi
   if [ "$committed" = 1 ] && [ "$swapped" = 0 ]; then
     echo "swap of gateway-app failed, retrying once" >&2
     if swap_key; then
@@ -112,7 +133,10 @@ k wait --for=delete pod -l app.kubernetes.io/name=gateway --timeout=60s >/dev/nu
 IMAGE="$(k get deploy gateway -o jsonpath='{.spec.template.spec.containers[0].image}' | tr -d '\r')"
 DBURL="$(k get deploy gateway -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="DATABASE_URL")].value}' | tr -d '\r')"
 k delete job "$JOB" --ignore-not-found >/dev/null
-cat > "$TMP/job.yaml" <<'EOF'
+# Quote the two values as JSON strings (valid YAML), so odd characters cannot break the manifest.
+IMAGE_Q="$(printf '%s' "$IMAGE" | jq -Rs .)"
+DBURL_Q="$(printf '%s' "$DBURL" | jq -Rs .)"
+cat > "$TMP/job.yaml" <<EOF
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -138,7 +162,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: rotate
-          image: __IMAGE__
+          image: $IMAGE_Q
           imagePullPolicy: IfNotPresent
           command: ["node", "dist/rotate-main.js"]
           env:
@@ -148,7 +172,7 @@ spec:
                   name: gateway-db
                   key: password
             - name: DATABASE_URL
-              value: "__DBURL__"
+              value: $DBURL_Q
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -178,7 +202,6 @@ spec:
             secretName: gateway-key-new
             defaultMode: 0440
 EOF
-sed -i -e "s|__IMAGE__|$IMAGE|" -e "s|__DBURL__|$DBURL|" "$TMP/job.yaml"
 k apply -f "$(winpath "$TMP/job.yaml")" >/dev/null
 
 echo "running the re-encrypt Job..."
@@ -189,6 +212,14 @@ for _ in $(seq 1 "$WAIT"); do
   read -t 1 <> <(:) || true
 done
 k logs "job/$JOB" --tail=5 || true
+if [ "$ok" != 1 ] && [ -z "$bad" ]; then
+  # Timeout: the Job is neither done nor failed. Remove it and wait until its pod is really gone, so it cannot commit later.
+  unknown=1
+  k delete job "$JOB" --ignore-not-found >/dev/null || true
+  k wait --for=delete pod -l app.kubernetes.io/name=gateway-rotate-key --timeout=60s >/dev/null 2>&1 || true
+  echo "the Job did not finish within ${WAIT}s" >&2
+  exit 1
+fi
 [ "$ok" = 1 ] || { echo "the Job did not succeed (transaction rolled back, nothing changed)" >&2; exit 1; }
 committed=1
 
