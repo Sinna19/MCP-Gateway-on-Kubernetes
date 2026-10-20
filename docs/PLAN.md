@@ -126,6 +126,7 @@ In this order:
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster; `scripts/dod-check.sh` rerun.
 
 ## Phase 8: VPS (k3s)
+- [ ] Review #7: `COOKIE_SECURE` and TLS in `values-prod.yaml`; add a `dod-check` assertion that prod renders Secure cookies
 - [ ] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
 - [ ] Secrets created on the server via script, never committed
 - [ ] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use

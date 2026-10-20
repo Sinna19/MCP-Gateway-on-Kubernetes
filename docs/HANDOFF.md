@@ -1,15 +1,17 @@
 # Handoff
-- **Done this session (7g part 2, rehearsal rows 7-17):**
-  - 745f7b7 `docs/REHEARSAL.md` rows 7-17 all PASS (row 16 on the 2nd try, see below), follow-ups section added; 7g ticked in `docs/PLAN.md`. `make dod` -> 8 passed, 0 failed.
-  - `~/.urumi-rehearsal` (b.hdr) deleted. No tag: phase-7 tag is Ash's call.
-  - One-off admin DB reset of `b@example.com`'s password (no reset feature exists; recorded as a follow-up).
-- **In progress:** nothing half-finished. Cluster `urumi` is up, 8 pods Ready, woo/fx/notes connected, fx and notes enabled.
-- **Next step:** `8 deploy/values-prod.yaml: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes` (first unchecked group in Phase 8). Suggest plan mode.
+- **Done this session (phase-7 review fixes, phase-6..HEAD):**
+  - `fix(gateway)`: audit args built inside `audit()`'s try (`{_unauditable:true}` on failure), `redact` depth cap 10 and null-prototype objects (`__proto__` kept), `listAll` stops at 20 pages / 500 tools (upstream goes unreachable, logged without args), `/mcp` authenticates before `express.json({limit:"1mb"})`, `FixedWindowLimiter` capped at 10k keys (sweep expired, then drop oldest). Tests for each.
+  - `fix(charts)`: one `global.network.upstreamPort` (platform values) read by woo-mcp, fx, notes and the gateway policy; `trust proxy = 1` comment in the gateway NetworkPolicy; ADR 019 updated.
+  - `fix(scripts)`: `secrets.sh` woo-mcp-token via mktemp file (no argv); `rotate-credentials-key.sh` renders the Job from an unquoted heredoc with JSON-quoted values (no sed), a Job timeout deletes the Job, waits for its pod to go, keeps gateway at 0 and the backups, prints recovery; new `prefixes` subcommand; ADR 023 Recovery table has the timeout row.
+  - Unplanned: `waitForDb` (SELECT 1 retry, 15x2s) in the rotate Job, because the Job hit `ECONNREFUSED` to Postgres twice in a row (NetworkPolicy sync race). Test added.
+  - Verified: `make lint`, `make test`, `make images`, `make deploy`, `make register`, `make dod` 8/8. `ROTATE_WAIT=1 make rotate-key` exercised the timeout path (gateway 0, backups kept, recovery printed, `prefixes` unchanged, recovered by hand); a normal `make rotate-key` then passed.
+- **In progress:** nothing. Cluster `urumi` up, 8 pods Ready, servers connected. No tag (Ash's call).
+- **Next step:** Phase 8 first group `deploy/values-prod.yaml`. Suggest plan mode. Review item #7 (COOKIE_SECURE / TLS in values-prod, plus a `dod-check` assertion that prod sets Secure) is a new checkbox in Phase 8.
 - **Gotchas learned:**
-  - `make rotate-key` failed once with `ECONNREFUSED` to Postgres from the Job pod; rolled back cleanly and the retry passed. Suspected NetworkPolicy sync race for a new pod. Watch for it in the Phase 8 upgrade rehearsal.
-  - `/mcp` rate limit counts only `tools/call` (60/min/key), not `tools/list`. A login for a disabled user shows the generic error and counts toward the 5-per-email 429.
-  - Calling a write tool with `{}` args proves the role check without creating data (input validation fails first).
-  - Per-session helper scripts (`b-mcp.sh`, `servers.sh`) are gone with the scratchpad; the `/mcp` flow is initialize -> read `Mcp-Session-Id` -> `notifications/initialized` -> call -> DELETE.
-  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths; hidden-input secrets are Ash's own one-liners.
-- **Follow-ups (not scheduled, in REHEARSAL.md):** member password reset, hint for admins on disabled logins, audit rejected (429/401) MCP requests, chat prompt line for "no tool covers this", rotate Job connect retry, a two-upstream chat prompt for the demo.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 8 section), `docs/REQUIREMENTS.md`, `deploy/values-local.yaml`, `charts/platform/values.yaml`, `.claude/rules/` file for charts.
+  - `python3` in Git Bash hangs (Windows Store stub): use node for scripted edits.
+  - Windows `openssl rand` prints CRLF: `tr -d '\r\n'` before writing a token file (a plain `\n` strip left a 65-byte token).
+  - `test/mcp-endpoint.test.ts` has a flaky test (a different one fails on some runs, also on the untouched tree); a rerun passes. Worth fixing before the final DoD.
+  - Rotate Job `ECONNREFUSED` is now retried inside the Job; Job *failed* = rolled back (safe), Job *timeout* = unknown (manual recovery, ADR 023).
+  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths.
+- **Follow-ups (not scheduled, in REHEARSAL.md):** member password reset, hint for admins on disabled logins, audit rejected (429/401) MCP requests, chat prompt line for "no tool covers this", a two-upstream chat prompt for the demo.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 8), `docs/REQUIREMENTS.md`, `deploy/values-local.yaml`, `charts/platform/values.yaml`, `.claude/rules/kubernetes.md`.
