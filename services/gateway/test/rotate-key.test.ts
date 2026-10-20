@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { decrypt, encrypt } from "../src/crypto.js";
-import { reencryptCredentials } from "../src/rotate-key.js";
+import { reencryptCredentials, waitForDb } from "../src/rotate-key.js";
 import { createTestDb, resetData } from "./helpers.js";
 
 describe("reencryptCredentials", () => {
@@ -62,5 +62,24 @@ describe("reencryptCredentials", () => {
     const err = await reencryptCredentials(pool, oldKey, newKey).catch((e: Error) => e);
     expect(String(err)).not.toContain(plain.fx);
     expect(String(err)).not.toContain(oldKey.toString("base64"));
+  });
+});
+
+describe("waitForDb", () => {
+  const fakePool = (failures: number) => {
+    let calls = 0;
+    return { calls: () => calls, pool: { query: async () => { if (calls++ < failures) throw new Error("connect ECONNREFUSED"); return {}; } } as unknown as pg.Pool };
+  };
+
+  it("retries a refused connection, then succeeds", async () => {
+    const { pool, calls } = fakePool(3);
+    await waitForDb(pool, 10, 0);
+    expect(calls()).toBe(4);
+  });
+
+  it("gives up with the last error after the tries are used", async () => {
+    const { pool, calls } = fakePool(99);
+    await expect(waitForDb(pool, 3, 0)).rejects.toThrow(/ECONNREFUSED/);
+    expect(calls()).toBe(3);
   });
 });

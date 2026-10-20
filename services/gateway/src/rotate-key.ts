@@ -51,3 +51,17 @@ export async function reencryptCredentials(pool: pg.Pool, oldKey: Buffer, newKey
     client.release();
   }
 }
+
+// A new pod's first connections can be refused until the NetworkPolicy has synced for its IP. SELECT 1 changes nothing,
+// so retrying it is safe; the rotation itself is never retried.
+export async function waitForDb(pool: pg.Pool, tries = 15, delayMs = 2000): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await pool.query("SELECT 1");
+      return;
+    } catch (err) {
+      if (attempt >= tries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
