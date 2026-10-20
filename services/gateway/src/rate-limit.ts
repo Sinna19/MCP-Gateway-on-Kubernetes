@@ -21,12 +21,14 @@ export class FixedWindowLimiter {
     private readonly max: number,
     private readonly windowMs: number,
     private readonly now: () => number = Date.now,
+    private readonly maxKeys = 10_000, // login emails are attacker-chosen, so the map needs a ceiling
   ) {}
 
   take(key: string): Take {
     const now = this.now();
     const w = this.windows.get(key);
     if (!w || now >= w.resetAt) {
+      if (!w && this.windows.size >= this.maxKeys) this.makeRoom();
       this.windows.set(key, { count: 1, resetAt: now + this.windowMs });
       return { ok: true };
     }
@@ -49,6 +51,12 @@ export class FixedWindowLimiter {
   sweep(): void {
     const now = this.now();
     for (const [key, w] of this.windows) if (now >= w.resetAt) this.windows.delete(key);
+  }
+
+  // Full: drop finished windows first; if all are live, drop the oldest (Map keeps insertion order).
+  private makeRoom(): void {
+    this.sweep();
+    while (this.windows.size >= this.maxKeys) this.windows.delete(this.windows.keys().next().value as string);
   }
 
   size(): number {

@@ -110,6 +110,18 @@ describe("/mcp endpoint", () => {
     }
   });
 
+  it("answers 401 before reading the body: a 2 MB or malformed unauthenticated POST is never parsed", async () => {
+    for (const body of ["x".repeat(2 * 1024 * 1024), "{not json"]) {
+      const res = await fetch(base, { method: "POST", headers: JSON_HEADERS, body });
+      expect(res.status).toBe(401);
+    }
+  });
+
+  it("still caps an authenticated body at 1 MB", async () => {
+    const res = await fetch(base, { method: "POST", headers: { ...JSON_HEADERS, Authorization: `Bearer ${alice.key}` }, body: JSON.stringify({ pad: "x".repeat(2 * 1024 * 1024) }) });
+    expect(res.status).toBe(413);
+  });
+
   it("lists the tools of all enabled upstreams with slug prefixes", async () => {
     const client = await connect(alice.key);
     const { tools } = await client.listTools();

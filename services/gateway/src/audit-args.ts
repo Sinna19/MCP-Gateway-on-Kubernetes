@@ -7,12 +7,19 @@ export const MAX_ARGS_BYTES = 2048;
 const SECRET_KEY = /pass|secret|token|key|auth|cookie/i;
 const REDACTED = "[redacted]";
 
+const MAX_DEPTH = 10;
+const TOO_DEEP = "[depth limit]";
+
 // Returns a copy; the args that go to the upstream are never touched.
-export function redact(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redact);
+// Objects are built from entries into a null-prototype object, so a "__proto__" key stays a plain own key.
+export function redact(value: unknown, depth = 0): unknown {
+  if (depth > MAX_DEPTH) return TOO_DEEP;
+  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1));
   if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, v] of Object.entries(value)) out[key] = SECRET_KEY.test(key) ? REDACTED : redact(v);
+    const out = Object.create(null) as Record<string, unknown>;
+    for (const [key, v] of Object.entries(value)) {
+      Object.defineProperty(out, key, { value: SECRET_KEY.test(key) ? REDACTED : redact(v, depth + 1), enumerable: true, writable: true, configurable: true });
+    }
     return out;
   }
   return value;

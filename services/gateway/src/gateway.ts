@@ -89,11 +89,18 @@ export class Gateway {
   // The one audit writer, for calls and declines: the tool name split and the args redaction live here only.
   private async audit(user: AuthUser, name: string, args: Record<string, unknown> | undefined, startedAt: Date, durationMs: number, outcome: Outcome, error: string | null, source: CallSource): Promise<void> {
     const parts = splitName(name);
-    const stored = auditArgs(args);
     try {
+      // Inside the try: odd args (a BigInt, a cycle) must cost the row its args, never the call its audit row.
+      let stored: unknown;
+      try {
+        stored = auditArgs(args);
+        if (stored !== null) stored = JSON.stringify(stored);
+      } catch {
+        stored = JSON.stringify({ _unauditable: true });
+      }
       await this.pool.query(
         "INSERT INTO audit_log (user_id, server_slug, tool, started_at, duration_ms, outcome, error, source, args) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        [user.id, parts?.slug ?? null, (parts?.tool ?? name).slice(0, MAX_TOOL_NAME), startedAt, durationMs, outcome, error?.slice(0, MAX_AUDIT_ERROR) ?? null, source, stored === null ? null : JSON.stringify(stored)],
+        [user.id, parts?.slug ?? null, (parts?.tool ?? name).slice(0, MAX_TOOL_NAME), startedAt, durationMs, outcome, error?.slice(0, MAX_AUDIT_ERROR) ?? null, source, stored],
       );
     } catch (err) {
       console.error("audit write failed:", err instanceof Error ? err.message : err);

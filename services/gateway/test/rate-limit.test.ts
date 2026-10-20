@@ -60,3 +60,26 @@ describe("FixedWindowLimiter", () => {
     expect(limiter.size()).toBe(1);
   });
 });
+
+describe("FixedWindowLimiter cap", () => {
+  it("sweeps expired windows first when full", () => {
+    const clock = { t: 1_000 };
+    const limiter = new FixedWindowLimiter(1, 100, () => clock.t, 3);
+    limiter.take("a");
+    clock.t += 10;
+    limiter.take("b");
+    limiter.take("c");
+    clock.t += 95; // only "a" has expired
+    limiter.take("d");
+    expect(limiter.size()).toBe(3); // a swept, b c d kept
+    expect(limiter.take("b").ok).toBe(false); // b's window was not dropped
+  });
+
+  it("drops the oldest live window when nothing has expired", () => {
+    const limiter = new FixedWindowLimiter(1, 60_000, () => 5, 3);
+    for (const k of ["a", "b", "c", "d", "e"]) limiter.take(k);
+    expect(limiter.size()).toBe(3);
+    expect(limiter.take("e").ok).toBe(false); // newest kept
+    expect(limiter.take("a").ok).toBe(true); // oldest was dropped, starts fresh
+  });
+});

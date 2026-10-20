@@ -79,7 +79,7 @@ export function createApp(options: AppOptions): App {
       () => res.status(503).send("database unreachable"),
     );
   });
-  app.use("/mcp", express.json({ limit: "1mb" }), mcp.router);
+  app.use("/mcp", mcp.router);
   app.use("/api", createApiRouter({ pool, upstreams, credentialsKey: options.credentialsKey, cookieSecure: options.cookieSecure ?? false, allowLoopback: options.allowLoopback, chat, login, sessions: mcp, keyUsage }));
   app.use(jsonErrors);
 

@@ -216,3 +216,21 @@ describe("UpstreamManager", () => {
     expect(manager.statuses()).toEqual([]);
   });
 });
+
+describe("UpstreamManager.listAll limits", () => {
+  const make = () => new UpstreamManager({ pool: {} as pg.Pool, credentialsKey: randomBytes(32), callTimeoutMs: 300, connectTimeoutMs: 400, pingTimeoutMs: 300, allowLoopback: true });
+  const listAll = (m: UpstreamManager, client: unknown) => (m as unknown as { listAll(c: unknown, s: string): Promise<unknown[]> }).listAll(client, "x");
+
+  it("gives up after 20 pages of a cursor that never ends", async () => {
+    let pages = 0;
+    const client = { listTools: async () => ({ tools: [{ name: `t${pages++}`, inputSchema: { type: "object" } }], nextCursor: "more" }) };
+    await expect(listAll(make(), client)).rejects.toThrow(/too many/);
+    expect(pages).toBe(20);
+  });
+
+  it("gives up past 500 tools", async () => {
+    const tools = Array.from({ length: 300 }, (_, i) => ({ name: `t${i}`, inputSchema: { type: "object" } }));
+    const client = { listTools: async () => ({ tools, nextCursor: "more" }) };
+    await expect(listAll(make(), client)).rejects.toThrow(/too many/);
+  });
+});

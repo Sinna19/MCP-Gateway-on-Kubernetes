@@ -202,3 +202,40 @@ describe("Gateway.callTool", () => {
     expect((await audit())[0].outcome).toBe("error");
   });
 });
+
+describe("Gateway.callTool with hostile args", () => {
+  let pool: pg.Pool;
+  let drop: () => Promise<void>;
+
+  beforeAll(async () => {
+    ({ pool, drop } = await createTestDb());
+  });
+  afterAll(async () => {
+    await drop();
+  });
+
+  async function setup(email: string) {
+    await resetData(pool);
+    const { rows } = await pool.query("INSERT INTO users (email, role, password_hash) VALUES ($1, 'member', 'x') RETURNING id", [email]);
+    const user: AuthUser = { id: rows[0].id, email, role: "member" };
+    const gateway = new Gateway(pool, { tools: (): Tool[] => [], callTool: async () => ({ content: [{ type: "text", text: "fine" }] }) });
+    return { user, gateway };
+  }
+
+  it("a 2000-deep body still gets an audit row and the call succeeds", async () => {
+    const { user, gateway } = await setup("h@x.io");
+    let deep: unknown = "leaf";
+    for (let i = 0; i < 2000; i++) deep = { a: deep };
+    const result = await gateway.callTool(user, "woo__t", { deep } as Record<string, unknown>, "mcp");
+    expect(result.isError).toBeFalsy();
+    const audit = (await pool.query("SELECT args FROM audit_log")).rows;
+    expect(audit).toHaveLength(1);
+    expect(JSON.stringify(audit[0].args)).toContain("[depth limit]");
+  });
+
+  it("stores {_unauditable: true} when the args cannot be turned into JSON", async () => {
+    const { user, gateway } = await setup("h2@x.io");
+    await gateway.callTool(user, "woo__t", { big: 10n } as unknown as Record<string, unknown>, "mcp");
+    expect((await pool.query("SELECT args FROM audit_log")).rows[0].args).toEqual({ _unauditable: true });
+  });
+});

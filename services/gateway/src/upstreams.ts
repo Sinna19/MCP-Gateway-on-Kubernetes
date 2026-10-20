@@ -7,6 +7,10 @@ import { decrypt } from "./crypto.js";
 import { isValidToolName, prefixed } from "./tool-names.js";
 import { assertAllowedHost } from "./url-guard.js";
 
+// An upstream that lists more than this is treated as broken or hostile, not served.
+const MAX_LIST_PAGES = 20;
+const MAX_LIST_TOOLS = 500;
+
 export type UpstreamStatus = "connected" | "unreachable" | "disabled";
 
 export interface ServerStatus {
@@ -196,7 +200,8 @@ export class UpstreamManager extends EventEmitter {
       try {
         entry.tools = await this.listAll(client, row.slug);
         this.emitIfChanged();
-      } catch {
+      } catch (err) {
+        console.warn(`upstream '${row.slug}' unreachable: ${err instanceof Error ? err.message : String(err)}`);
         this.markUnreachable(entry);
         this.emitIfChanged();
       }
@@ -223,9 +228,13 @@ export class UpstreamManager extends EventEmitter {
   private async listAll(client: Client, slug: string): Promise<Tool[]> {
     const tools: Tool[] = [];
     let cursor: string | undefined;
+    let pages = 0;
     do {
+      // A hostile upstream can page forever or return a huge list; the caller marks it unreachable.
+      if (++pages > MAX_LIST_PAGES) throw new Error(`too many tool pages (more than ${MAX_LIST_PAGES})`);
       const page = await client.listTools(cursor ? { cursor } : undefined, { timeout: this.connectTimeoutMs });
       tools.push(...page.tools);
+      if (tools.length > MAX_LIST_TOOLS) throw new Error(`too many tools (more than ${MAX_LIST_TOOLS})`);
       cursor = page.nextCursor;
     } while (cursor);
     return tools.filter((t) => {

@@ -69,3 +69,21 @@ describe("auditArgs", () => {
     expect(auditArgs(args)).toEqual({ token: "[redacted]", name: "W" });
   });
 });
+
+describe("hostile input", () => {
+  it("keeps a __proto__ key as an own property instead of changing the prototype", () => {
+    const body = JSON.parse('{"__proto__": {"polluted": 1}, "ok": 2}');
+    const out = redact(body) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBeNull();
+    expect(Object.keys(out)).toEqual(["__proto__", "ok"]);
+    expect(JSON.stringify(out)).toBe('{"__proto__":{"polluted":1},"ok":2}');
+  });
+
+  it("stops at depth 10 with a marker, so a 2000-deep body cannot blow the stack", () => {
+    let deep: unknown = "leaf";
+    for (let i = 0; i < 2000; i++) deep = { a: deep };
+    const out = auditArgs({ start: deep });
+    expect(JSON.stringify(out)).toContain("[depth limit]");
+    expect(JSON.stringify(out)).not.toContain("leaf");
+  });
+});

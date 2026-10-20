@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, isInitializeRequest, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Router, type Request, type RequestHandler, type Response } from "express";
+import express, { Router, type Request, type RequestHandler, type Response } from "express";
 import type pg from "pg";
 import { findUserByKey, hashKey, type AuthUser, type KeyUsage } from "./api-keys.js";
 import type { Gateway } from "./gateway.js";
@@ -134,9 +134,11 @@ export function createMcpEndpoint(options: McpEndpointOptions) {
   };
 
   const router = Router();
-  router.post("/", authenticate, guarded);
-  router.get("/", authenticate, guarded);
-  router.delete("/", authenticate, guarded);
+  // Authenticate first, then parse: an unauthenticated caller never makes us read or parse a body.
+  router.use(authenticate, express.json({ limit: "1mb" }));
+  router.post("/", guarded);
+  router.get("/", guarded);
+  router.delete("/", guarded);
 
   return {
     router,
