@@ -122,7 +122,7 @@ In this order:
 - **Accept:** rotate on a running cluster, upstream calls still work; images pinned or the reason documented; `scripts/dod-check.sh` rerun.
 
 ### 7g Full manual rehearsal
-- [ ] Full manual rehearsal with users A and B on a fresh cluster, following the DoD in `docs/ASSIGNMENT.md`
+- [x] Full manual rehearsal with users A and B on a fresh cluster, following the DoD in `docs/ASSIGNMENT.md`
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster; `scripts/dod-check.sh` rerun.
 
 ## Phase 8: VPS (k3s)
