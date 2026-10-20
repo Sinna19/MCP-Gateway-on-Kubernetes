@@ -1,16 +1,15 @@
 # Handoff
-- **Done this session (7g part 1, fresh-cluster rehearsal):**
-  - 07f676e `docs/REHEARSAL.md` runbook (steps 1-8) plus results; `scripts/secrets.sh` comment now points at the argv-free LLM key one-liner.
-  - Cluster deleted and rebuilt from the runbook only: 5 images imported (crictl lists all 5), `make deploy` ok, 8 pods 1/1 RESTARTS 0, `make register` woo 5 / fx 2 / notes 3 connected.
-  - Rows 1-6b and 8 PASS (rows 1-6b by Ash in the browser; row 8 by `b-mcp.sh`, restricted call audited as an error row under B).
-- **In progress:** nothing half-finished. Resume at `docs/REHEARSAL.md` row 7 (table row "7 | B external client", `_pending, next_`) and row 9 (`_pending_`). 7g is NOT ticked in `docs/PLAN.md`; do not tag phase-7.
-- **Next step:** `7 7g rehearsal part 2: row 7 (MCP Inspector), row 9, then rows 10-17 and make dod`. **Do NOT delete or rebuild the cluster.** Users A (`admin@urumi.local`) and B (`b@example.com`, member) already exist.
+- **Done this session (7g part 2, rehearsal rows 7-17):**
+  - 745f7b7 `docs/REHEARSAL.md` rows 7-17 all PASS (row 16 on the 2nd try, see below), follow-ups section added; 7g ticked in `docs/PLAN.md`. `make dod` -> 8 passed, 0 failed.
+  - `~/.urumi-rehearsal` (b.hdr) deleted. No tag: phase-7 tag is Ash's call.
+  - One-off admin DB reset of `b@example.com`'s password (no reset feature exists; recorded as a follow-up).
+- **In progress:** nothing half-finished. Cluster `urumi` is up, 8 pods Ready, woo/fx/notes connected, fx and notes enabled.
+- **Next step:** `8 deploy/values-prod.yaml: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes` (first unchecked group in Phase 8). Suggest plan mode.
 - **Gotchas learned:**
-  - B's key is in `/c/Users/aashi/.urumi-rehearsal/b.hdr` (outside the repo and the session scratchpad, so it survives `/clear`). Never cat/echo it, no `curl -v`/`--trace`; only `curl -H @file`. Delete the file and its dir at the end of part 2. `chmod` is a no-op on NTFS (stat shows 644); the Windows ACL (user, SYSTEM, Administrators) is the protection.
-  - `b-mcp.sh` lived in the old session scratchpad and is gone: recreate it (curl: initialize, read `Mcp-Session-Id` from the response headers, `notifications/initialized`, then `tools/list` or `tools/call`, parse `data:` lines of the SSE reply, DELETE the session at the end).
-  - Row 13 disabling B also kills B's dashboard session: B logs in again before row 15.
-  - "today" is the UTC day for the chat agent (recorded in REHEARSAL.md as a known limitation, not a bug).
-  - Browser autofill may fill the old cluster's passwords; use the one-liners in REHEARSAL.md step 8.
-  - Hidden-input steps (LLM key done; any new secret) are Ash's one-liners, never `read -s` through Claude Code.
-  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths.
-- **Files the next task needs:** `docs/REHEARSAL.md` (rows and the runbook), `docs/PLAN.md` (tick 7g at the end), `scripts/dod-check.sh` (only run it), `Makefile` (`rotate-key`, `register`, `dod`).
+  - `make rotate-key` failed once with `ECONNREFUSED` to Postgres from the Job pod; rolled back cleanly and the retry passed. Suspected NetworkPolicy sync race for a new pod. Watch for it in the Phase 8 upgrade rehearsal.
+  - `/mcp` rate limit counts only `tools/call` (60/min/key), not `tools/list`. A login for a disabled user shows the generic error and counts toward the 5-per-email 429.
+  - Calling a write tool with `{}` args proves the role check without creating data (input validation fails first).
+  - Per-session helper scripts (`b-mcp.sh`, `servers.sh`) are gone with the scratchpad; the `/mcp` flow is initialize -> read `Mcp-Session-Id` -> `notifications/initialized` -> call -> DELETE.
+  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths; hidden-input secrets are Ash's own one-liners.
+- **Follow-ups (not scheduled, in REHEARSAL.md):** member password reset, hint for admins on disabled logins, audit rejected (429/401) MCP requests, chat prompt line for "no tool covers this", rotate Job connect retry, a two-upstream chat prompt for the demo.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 8 section), `docs/REQUIREMENTS.md`, `deploy/values-local.yaml`, `charts/platform/values.yaml`, `.claude/rules/` file for charts.
