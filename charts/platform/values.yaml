@@ -7,6 +7,9 @@ global:
     tls: false
   # Who the NetworkPolicies treat as the ingress controller and DNS. Namespaces match on kubernetes.io/metadata.name.
   network:
+    # Container port of every upstream MCP server (woo, fx, notes). The three charts and the gateway's egress
+    # policy all read this one value, so they cannot drift (ADR 019). Registered URLs must use the same port.
+    upstreamPort: 3000
     ingressController:
       namespace: kube-system
       podLabels:

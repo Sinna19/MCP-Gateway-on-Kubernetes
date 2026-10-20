@@ -1,7 +1,9 @@
 # Ingress: only Traefik. Egress: DNS, its Postgres, the upstream MCP servers, and public HTTPS (LLM, external upstreams).
 # The ipBlock leaves out private ranges, so the Kubernetes API, WordPress and metadata endpoints are unreachable even if
 # an admin registers such a URL. url-guard checks first; this is the second layer (ADR 019).
-# Ports are container ports. Upstreams all listen on upstreamPort.
+# The gateway runs Express with trust proxy = 1 (client IP for the login limiter = last X-Forwarded-For hop). That is
+# safe only because this policy admits Traefik alone: nothing else can reach the gateway and forge the header (ADR 019, 020).
+# Ports are container ports. Upstreams all listen on global.network.upstreamPort.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -52,7 +54,7 @@ spec:
                 operator: In
                 values: [woo-mcp, fx-mcp, notes-mcp]
       ports:
-        - port: {{ .Values.networkPolicy.upstreamPort }}
+        - port: {{ .Values.global.network.upstreamPort }}
           protocol: TCP
     - to:
         - ipBlock:

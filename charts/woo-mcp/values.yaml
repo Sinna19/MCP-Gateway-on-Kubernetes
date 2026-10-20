@@ -3,7 +3,7 @@ image:
   # Must be set. `make deploy` passes the tree hash of services/woo-mcp.
   tag: ""
 
-port: 3000
+# Container port comes from global.network.upstreamPort (charts/platform/values.yaml), shared with the gateway policy.
 
 # In-cluster URL of the store Service. Plain HTTP is fine inside the cluster.
 wooUrl: http://store-wordpress

@@ -11,5 +11,5 @@ spec:
     app.kubernetes.io/name: woo-mcp
   ports:
     - name: http
-      port: {{ .Values.port }}
+      port: {{ .Values.global.network.upstreamPort }}
       targetPort: http

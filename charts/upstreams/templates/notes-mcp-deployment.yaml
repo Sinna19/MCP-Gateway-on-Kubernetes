@@ -37,10 +37,10 @@ spec:
               drop: ["ALL"]
           ports:
             - name: http
-              containerPort: {{ .Values.notes.port }}
+              containerPort: {{ .Values.global.network.upstreamPort }}
           env:
             - name: PORT
-              value: {{ .Values.notes.port | quote }}
+              value: {{ .Values.global.network.upstreamPort | quote }}
             - name: NOTES_KEY
               valueFrom:
                 secretKeyRef:

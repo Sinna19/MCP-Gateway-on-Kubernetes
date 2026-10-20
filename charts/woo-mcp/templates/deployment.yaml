@@ -42,10 +42,10 @@ spec:
               drop: ["ALL"]
           ports:
             - name: http
-              containerPort: {{ .Values.port }}
+              containerPort: {{ .Values.global.network.upstreamPort }}
           env:
             - name: PORT
-              value: {{ .Values.port | quote }}
+              value: {{ .Values.global.network.upstreamPort | quote }}
             - name: WOO_URL
               value: {{ .Values.wooUrl | quote }}
             - name: WOO_USER

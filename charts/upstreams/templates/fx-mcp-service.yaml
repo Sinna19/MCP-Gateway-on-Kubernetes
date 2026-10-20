@@ -12,6 +12,6 @@ spec:
     app.kubernetes.io/name: fx-mcp
   ports:
     - name: http
-      port: {{ .Values.fx.port }}
+      port: {{ .Values.global.network.upstreamPort }}
       targetPort: http
 {{- end }}

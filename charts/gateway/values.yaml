@@ -50,11 +50,6 @@ limits:
 # First upstream registered on first start (in-cluster woo-mcp Service).
 seedWooUrl: http://woo-mcp:3000/mcp
 
-# Port every upstream MCP server listens on (container port). Must equal woo-mcp.port and upstreams.*.port:
-# subcharts cannot read each other's values.
-networkPolicy:
-  upstreamPort: 3000
-
 resources:
   requests:
     cpu: 50m

@@ -19,6 +19,6 @@ spec:
             matchLabels:
               {{- toYaml .Values.notes.allowedClientLabel | nindent 14 }}
       ports:
-        - port: {{ .Values.notes.port }}
+        - port: {{ .Values.global.network.upstreamPort }}
           protocol: TCP
 {{- end }}

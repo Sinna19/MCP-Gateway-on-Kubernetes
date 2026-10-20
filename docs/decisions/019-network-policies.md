@@ -10,7 +10,7 @@ Only woo-mcp, fx-mcp, notes-mcp and gateway-postgres had ingress policies. Maria
 - **Default-deny ingress** for the whole namespace (`charts/platform/templates/default-deny-ingress.yaml`). Every pod needs an explicit allow.
 - **No namespace-wide default-deny egress.** The store setup Job calls the Kubernetes API (fills the `woo-api` Secret) and downloads WooCommerce, and allowing the API server by ipBlock is fragile. The setup Job is the one pod with open egress. Every long-running workload has its own egress policy instead.
 - **Selectors for Traefik and CoreDNS** live once in `global.network` (platform values). Namespaces match on `kubernetes.io/metadata.name`.
-- **Ports are container ports**, not Service ports: kube-router checks after the Service is translated to the pod. Hard-coded where the Deployment hard-codes them (WordPress 80, MariaDB 3306, Postgres 5432); `gateway.networkPolicy.upstreamPort` must equal `woo-mcp.port` and `upstreams.*.port`.
+- **Ports are container ports**, not Service ports: kube-router checks after the Service is translated to the pod. Hard-coded where the Deployment hard-codes them (WordPress 80, MariaDB 3306, Postgres 5432); all upstream charts and the gateway policy read `global.network.upstreamPort`.
 
 | Workload | Ingress from | Egress to |
 |---|---|---|
@@ -29,4 +29,4 @@ Only woo-mcp, fx-mcp, notes-mcp and gateway-postgres had ingress policies. Maria
 - The gateway can no longer reach the Kubernetes API, WordPress, metadata endpoints or other private addresses.
 - **Limitation:** inside the namespace a label is the identity. Any pod created in `urumi` with `app.kubernetes.io/name=setup` reaches MariaDB (the test probe does exactly that). The namespace is the trust boundary, and RBAC on pod create is the real control.
 - Probes: kube-router rejects blocked traffic (exit 7 / ECONNREFUSED). Test WordPress with `/wp-json/`, not `/`, which redirects to the public host and fails for an unrelated reason.
-- **Manual coupling:** `gateway.networkPolicy.upstreamPort` is kept equal by hand to `woo-mcp.port`, `upstreams.fx.port` and `upstreams.notes.port`, because subcharts cannot read each other's values. If one changes and the others do not, the gateway silently loses that upstream (connection refused). Accepted for now; named ports or a platform-level `global` value would remove it.
+- **One shared port (was manual coupling):** the upstream container port is a single value, `global.network.upstreamPort` in `charts/platform/values.yaml`; woo-mcp, fx, notes and the gateway egress policy all read it, so they cannot drift. Registered upstream URLs (`seedWooUrl`, `make register`) still spell the port and must match.

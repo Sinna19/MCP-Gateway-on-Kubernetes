@@ -12,6 +12,6 @@ spec:
     app.kubernetes.io/name: notes-mcp
   ports:
     - name: http
-      port: {{ .Values.notes.port }}
+      port: {{ .Values.global.network.upstreamPort }}
       targetPort: http
 {{- end }}

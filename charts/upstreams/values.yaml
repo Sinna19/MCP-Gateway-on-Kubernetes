@@ -6,7 +6,6 @@ fx:
     # Must be set. `make deploy` passes the tree hash of services/fx-mcp.
     tag: ""
 
-  port: 3000
 
   # Secret created by scripts/secrets.sh. Key: token. Read at pod start, so rotating it needs
   # `kubectl rollout restart deploy/fx-mcp` (ADR 010).
@@ -30,7 +29,6 @@ notes:
     # Must be set. `make deploy` passes the tree hash of services/notes-mcp.
     tag: ""
 
-  port: 3000
 
   # Secret created by scripts/secrets.sh. Key: key (sent by the gateway as the X-Notes-Key header).
   # Read at pod start, so rotating it needs `kubectl rollout restart deploy/notes-mcp` (ADR 011).

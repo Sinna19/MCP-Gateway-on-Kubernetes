@@ -37,10 +37,10 @@ spec:
               drop: ["ALL"]
           ports:
             - name: http
-              containerPort: {{ .Values.fx.port }}
+              containerPort: {{ .Values.global.network.upstreamPort }}
           env:
             - name: PORT
-              value: {{ .Values.fx.port | quote }}
+              value: {{ .Values.global.network.upstreamPort | quote }}
             - name: FX_TOKEN
               valueFrom:
                 secretKeyRef:
