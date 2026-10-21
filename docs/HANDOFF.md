@@ -1,17 +1,13 @@
 # Handoff
-- **Done this session (phase-7 review fixes, phase-6..HEAD):**
-  - `fix(gateway)`: audit args built inside `audit()`'s try (`{_unauditable:true}` on failure), `redact` depth cap 10 and null-prototype objects (`__proto__` kept), `listAll` stops at 20 pages / 500 tools (upstream goes unreachable, logged without args), `/mcp` authenticates before `express.json({limit:"1mb"})`, `FixedWindowLimiter` capped at 10k keys (sweep expired, then drop oldest). Tests for each.
-  - `fix(charts)`: one `global.network.upstreamPort` (platform values) read by woo-mcp, fx, notes and the gateway policy; `trust proxy = 1` comment in the gateway NetworkPolicy; ADR 019 updated.
-  - `fix(scripts)`: `secrets.sh` woo-mcp-token via mktemp file (no argv); `rotate-credentials-key.sh` renders the Job from an unquoted heredoc with JSON-quoted values (no sed), a Job timeout deletes the Job, waits for its pod to go, keeps gateway at 0 and the backups, prints recovery; new `prefixes` subcommand; ADR 023 Recovery table has the timeout row.
-  - Unplanned: `waitForDb` (SELECT 1 retry, 15x2s) in the rotate Job, because the Job hit `ECONNREFUSED` to Postgres twice in a row (NetworkPolicy sync race). Test added.
-  - Verified: `make lint`, `make test`, `make images`, `make deploy`, `make register`, `make dod` 8/8. `ROTATE_WAIT=1 make rotate-key` exercised the timeout path (gateway 0, backups kept, recovery printed, `prefixes` unchanged, recovered by hand); a normal `make rotate-key` then passed.
-- **In progress:** nothing. Cluster `urumi` up, 8 pods Ready, servers connected. No tag (Ash's call).
-- **Next step:** Phase 8 first group `deploy/values-prod.yaml`. Suggest plan mode. Review item #7 (COOKIE_SECURE / TLS in values-prod, plus a `dod-check` assertion that prod sets Secure) is a new checkbox in Phase 8.
+- **Done this session (Phase 8, session 1a: context selection only):**
+  - `074c865 feat(scripts)`: Makefile `ENV=local|prod` -> `KUBE_CONTEXT` (k3d-urumi / urumi-vps), `KUBECONFIG` only for prod, `$(KUBECTL)`/`$(HELM)` with explicit context, `VALUES`, prod `GATEWAY_URL` from `PROD_DOMAIN`; `ENV=prod` refuses `cluster-up`/`cluster-down`/`images`. `scripts/lib/kube.sh` (allowlist `k3d-*|urumi-vps`, wraps kubectl/helm) sourced by dod-check, rotate-key, secrets, register-upstreams, wait-setup; `DOD_CONTEXT`/`ROTATE_CONTEXT` removed. Hook: read-only passes, mutating `urumi-vps` asks, other context denies, default context must be k3d. Fixture tests `.claude/hooks/test-guard-kube-context.sh` (21 cases). `make lint` fails on an empty or spaced prod domain. Rule line added to `.claude/rules/kubernetes.md`.
+  - `525047c fix(scripts)`: wait-setup backgrounds `command kubectl` (see gotchas).
+  - Verified on k3d: `make lint`, `make test`, `make deploy`, `make register`, `make dod` 8/8; `KUBE_CONTEXT=foo bash scripts/dod-check.sh` refuses; hook tests ok; default context still `k3d-urumi`.
+- **In progress:** nothing. ADR 024 is not written yet (it belongs to 1b).
+- **Next step:** `8 task 1b: values-prod + TLS plumbing` (plan: `C:\Users\aashi\.claude\plans\pasted-content-id-bcf0-phase-8-starry-aurora.md`, sections 1c-1f). Prove the mu-plugin on k3d with `--set store.wordpress.environmentType=production` before anything touches the VPS.
 - **Gotchas learned:**
-  - `python3` in Git Bash hangs (Windows Store stub): use node for scripted edits.
-  - Windows `openssl rand` prints CRLF: `tr -d '\r\n'` before writing a token file (a plain `\n` strip left a 65-byte token).
-  - `test/mcp-endpoint.test.ts` has a flaky test (a different one fails on some runs, also on the untouched tree); a rerun passes. Worth fixing before the final DoD.
-  - Rotate Job `ECONNREFUSED` is now retried inside the Job; Job *failed* = rolled back (safe), Job *timeout* = unknown (manual recovery, ADR 023).
-  - Earlier gotchas still apply: `kubectl wait --all` hangs on the Completed setup pod (use `-l '!job-name'`); `kubectl` on Windows needs `cygpath -m` for `/tmp` paths.
-- **Follow-ups (not scheduled, in REHEARSAL.md):** member password reset, hint for admins on disabled logins, audit rejected (429/401) MCP requests, chat prompt line for "no tool covers this", a two-upstream chat prompt for the demo.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 8), `docs/REQUIREMENTS.md`, `deploy/values-local.yaml`, `charts/platform/values.yaml`, `.claude/rules/kubernetes.md`.
+  - A `kubectl` shell function (kube.sh) turns `kubectl ... &` into a subshell; `kill $!` then leaves the real kubectl running and `make deploy | tail` hangs until its timeout. Background `command kubectl --context "$KUBE_CONTEXT" ...` instead (comment in wait-setup.sh).
+  - Scripted edits through `node -e`/heredoc eat backslashes (`\1` became byte 001). Use the Edit tool for lines with `\(`/`\1`, or build with `String.fromCharCode(92)`.
+  - `ENV=prod make -n` still prints the line after a refusing `exit 1`; the real run stops at the refusal.
+  - Earlier gotchas still apply (flaky `test/mcp-endpoint.test.ts`, `kubectl wait --all` on the Completed setup pod, `cygpath -m` for `/tmp` paths).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 8), the plan file above, `deploy/values-prod.yaml`, `charts/platform/values.yaml`, `charts/{store,gateway,dashboard}/templates/*ingress.yaml`, `charts/store/templates/{_helpers.tpl,wordpress-deployment.yaml}`, `scripts/dod-check.sh`, `Makefile`.
