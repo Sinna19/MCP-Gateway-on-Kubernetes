@@ -24,7 +24,11 @@ TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
 TS_PROJECTS := $(addprefix services/,$(TS_SERVICES)) apps/dashboard
 
 .NOTPARALLEL:
-.PHONY: cluster-up cluster-down images deps secrets deploy register lint test dod rotate-key
+.PHONY: cluster-up cluster-down images push-images ping cert-manager deps secrets deploy register lint test dod rotate-key
+
+# Proves the selected cluster answers (for prod: the SSH tunnel is up and the kubeconfig works).
+ping:
+	$(KUBECTL) get nodes
 
 # These manage the local k3d cluster only. On prod they refuse: deleting the namespace or its TLS Secrets
 # would burn Let's Encrypt rate limits (5 duplicate certs per week on the shared sslip.io domain).
@@ -64,6 +68,26 @@ endif
 	docker build -q -t urumi/dashboard:$(DASHBOARD_TAG) apps/dashboard
 	k3d image import -c urumi urumi/dashboard:$(DASHBOARD_TAG)
 
+# cert-manager is its own release, not a subchart: its CRDs must exist before the platform chart renders ClusterIssuers (ADR 024).
+CERT_MANAGER_VERSION := v1.21.2
+cert-manager:
+ifneq ($(ENV),prod)
+	@echo "cert-manager is VPS only (local k3d has no TLS, ADR 024)" >&2; exit 1
+endif
+	$(HELM) upgrade --install cert-manager cert-manager --repo https://charts.jetstack.io --version $(CERT_MANAGER_VERSION) \
+	  -n cert-manager --create-namespace --set crds.enabled=true \
+	  --set resources.requests.cpu=10m --set resources.requests.memory=64Mi --set resources.limits.memory=128Mi \
+	  --set webhook.resources.requests.cpu=10m --set webhook.resources.requests.memory=32Mi --set webhook.resources.limits.memory=64Mi \
+	  --set cainjector.resources.requests.cpu=10m --set cainjector.resources.requests.memory=64Mi --set cainjector.resources.limits.memory=128Mi \
+	  --wait --timeout 5m
+
+# Sends the current image tags to the VPS node over ssh (ADR 024). Run `make images` first.
+push-images:
+ifneq ($(ENV),prod)
+	@echo "push-images is for ENV=prod; locally use make images (k3d image import)" >&2; exit 1
+endif
+	IMAGES="urumi/woo-mcp:$(WOO_MCP_TAG) urumi/gateway:$(GATEWAY_TAG) urumi/fx-mcp:$(FX_MCP_TAG) urumi/notes-mcp:$(NOTES_MCP_TAG) urumi/dashboard:$(DASHBOARD_TAG)" scripts/push-images.sh
+
 deps:
 	$(HELM) dependency update charts/platform >/dev/null
 
@@ -71,7 +95,9 @@ secrets:
 	scripts/secrets.sh
 
 # HELM_EXTRA adds helm flags, e.g. make deploy HELM_EXTRA="--set store.wordpress.environmentType=production".
-deploy: deps secrets images
+# Prod images are side-loaded by hand first (make images, then make push-images from a shell with ssh-agent loaded).
+DEPLOY_IMAGES := $(if $(filter prod,$(ENV)),,images)
+deploy: deps secrets $(DEPLOY_IMAGES)
 	$(HELM) upgrade --install platform charts/platform -n $(NS) --create-namespace -f $(VALUES) \
 	  --set woo-mcp.image.tag=$(WOO_MCP_TAG) --set gateway.image.tag=$(GATEWAY_TAG) \
 	  --set upstreams.fx.image.tag=$(FX_MCP_TAG) --set upstreams.notes.image.tag=$(NOTES_MCP_TAG) \
