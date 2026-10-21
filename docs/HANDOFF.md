@@ -1,11 +1,15 @@
 # Handoff
-- **Done this session (Phase 8, session 1b: prod values + TLS plumbing):**
-  - `d99e6a9 feat(charts)`: `deploy/values-prod.yaml` (domain on its own line, staging issuer, tls, redirect, `environmentType: production`, LLM); `global.ingress.clusterIssuer/redirectHttps` and `certManager.clusterIssuers` in `charts/platform/values.yaml`; store + gateway Ingresses carry the cert-manager annotation (dashboard does not, shares `gateway-tls`); all three use the redirect Middleware annotation when `redirectHttps`; platform templates `redirect-middleware.yaml`, `cluster-issuers.yaml` (two ClusterIssuers + HTTP-01 solver NetworkPolicy, port 8089); `store-mu-plugin` ConfigMap mounted by subPath in WordPress and the setup Job; `make lint` checks prod renders `COOKIE_SECURE "true"`; `dod-check` Secure/HttpOnly assertion (https) or "cookie Secure: skipped (http)"; `make deploy HELM_EXTRA="..."`; ADR 024; PLAN boxes (Review #7, values-prod, TLS) ticked.
-  - Verified on k3d: `make lint && make test` ok; prod render shows annotations (store, gateway), Middleware, ClusterIssuers, COOKIE_SECURE "true"; deploy with `environmentType=production`: `woo-api` has password, register + `make dod` 8/8 (woo calls pass over in-cluster HTTP), wp-config.php:122 has the `HTTP_X_FORWARDED_PROTO` -> `HTTPS=on` mapping; redeploy local: type `local`, dod 8/8, "cookie Secure: skipped (http)".
-- **In progress:** nothing. Not yet proven (needs real cert-manager/VPS): the ClusterIssuer and Middleware CRDs apply, solver policy, the "cookie Secure: PASS" line.
-- **Next step:** `8 session 2: first VPS deploy` (plan: `C:\Users\aashi\.claude\plans\pasted-content-id-bcf0-phase-8-starry-aurora.md`, "Session 2"). Needs the SSH tunnel up (Ash runs it) and `~/.kube/urumi-vps.yaml`. Start with `ENV=prod make ping` (target not written yet), pin the cert-manager version and record it in ADR 024.
+- **Done this session (Phase 8, session 2a: first VPS deploy, staging issuer):**
+  - `bb2a1b8 feat(scripts)`: `make ping`, `make cert-manager` (chart pinned v1.21.2), `make push-images` + `scripts/push-images.sh`, `ENV=prod make deploy` skips the image build; ADR 024 updated (pin, side-load note, VPS proof).
+  - On the VPS: cert-manager 3 pods Running; Traefik/CoreDNS labels match `global.network`; 5 images side-loaded by Ash; `ENV=prod make secrets` + `make deploy` ok, all pods Ready (no ImagePull errors), setup Job complete.
+  - Proof: `gateway-tls` and `store-wordpress-tls` Ready first try (issuer `letsencrypt-staging`, hairpin self-check fine); `curl -skI https://shop.20.197.63.44.sslip.io` 200; `http://app.…` 308 to https; node requests cpu 32%, mem 31%.
+- **In progress:** nothing. Not done: `llm-api` Secret (chat disabled until created), `make register`, `make dod` on https, the `cookie Secure: PASS` line, prod issuer.
+- **Next step:** `8 session 2b: set llm-api, flip clusterIssuer to letsencrypt-prod in deploy/values-prod.yaml, ENV=prod make deploy, check issuer, ENV=prod make register, ENV=prod make dod, openssl issuer check` (plan Session 2, steps 5-6; never delete the TLS Secrets, stop on `rateLimited`).
 - **Gotchas learned:**
-  - Named templates are global in Helm, but subchart lint renders alone, so each chart's ingress inlines its annotation block instead of a shared helper.
-  - Scripted edits with Python heredocs: strip CR afterwards (`sed -i 's/\r$//'`); no-op edits are easy to write by mistake, check `git diff`.
-  - Earlier gotchas still apply (kube.sh functions can't be backgrounded, flaky `test/mcp-endpoint.test.ts`, `kubectl wait --all` on the Completed setup pod).
-- **Files the next task needs:** the plan file above (Session 2), `Makefile`, `deploy/values-prod.yaml`, `scripts/lib/kube.sh`, `scripts/secrets.sh`, `docs/decisions/024-vps-deploy.md`.
+  - The ssh key is passphrase-protected: only Ash can run `ENV=prod make push-images` (shell with ssh-agent loaded; run `make images` first). The tool shell gets `Permission denied (publickey)`.
+  - llm-api (Ash runs, hidden input): `read -rs k; KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml) kubectl --context urumi-vps -n urumi create secret generic llm-api --from-literal=api-key="$k"; unset k`, then restart the gateway.
+  - woo-mcp pod shows FailedMount "non-existent secret key: password" until the setup Job fills `woo-api`; it self-heals within a few minutes.
+  - Python `'\\\n'` in Makefile edits produced a literal backslash-n; check with `cat -A`.
+  - Plain Git Bash needs `export KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml)` for direct kubectl against the VPS.
+  - The kube-context hook scans command text: a backtick right after a context name in a heredoc is denied; write docs with the Write tool.
+- **Files the next task needs:** plan file `C:\Users\aashi\.claude\plans\pasted-content-id-bcf0-phase-8-starry-aurora.md` (Session 2), `deploy/values-prod.yaml`, `scripts/dod-check.sh`, `docs/decisions/024-vps-deploy.md`.
