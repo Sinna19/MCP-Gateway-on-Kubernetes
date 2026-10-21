@@ -16,9 +16,11 @@ kubectl -n "$NS" get "$job" -o name >/dev/null 2>&1 || { echo "wait-setup: $job 
 echo "wait-setup: waiting for $job"
 
 # Wait for "complete" and "failed" at the same time, so a crashing Job fails fast instead of at the timeout.
-kubectl -n "$NS" wait --for=condition=complete "$job" --timeout="$TIMEOUT" >/dev/null 2>&1 &
+# `command kubectl`, not the wrapper from lib/kube.sh: kill must hit kubectl itself, not a function subshell
+# (which would leave kubectl running and the caller's pipe open).
+command kubectl --context "$KUBE_CONTEXT" -n "$NS" wait --for=condition=complete "$job" --timeout="$TIMEOUT" >/dev/null 2>&1 &
 complete_pid=$!
-kubectl -n "$NS" wait --for=condition=failed "$job" --timeout="$TIMEOUT" >/dev/null 2>&1 &
+command kubectl --context "$KUBE_CONTEXT" -n "$NS" wait --for=condition=failed "$job" --timeout="$TIMEOUT" >/dev/null 2>&1 &
 failed_pid=$!
 wait -n || true
 kill "$complete_pid" "$failed_pid" 2>/dev/null || true
