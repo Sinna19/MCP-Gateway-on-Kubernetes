@@ -1,28 +1,26 @@
 # Handoff
-## Done this session (Phase 9, D: README run-through)
-- Ran `make cluster-down`, then README "Run locally (k3d)" top to bottom on a fresh k3d cluster: `make cluster-up`, `make deploy`, `make register`, admin-password command, `make dod`.
-- **Fixes to README or scripts: none needed.** Every command worked as written, so nothing was committed.
-- `make dod`: `8 passed, 0 failed`.
-- Member key check: logged in as the dod-member user, created a key via `POST /api/keys`, `initialize` then `tools/call woo__list_orders` on `http://app.localtest.me/mcp` returned `{"items":[],"total":0,"total_pages":0}`, then revoked the key (204).
-- `app.localtest.me` and `shop.localtest.me` both return 200.
+## Done this session (Phase 9 D: demo script)
+- Wrote `docs/DEMO_SCRIPT.md` (a0e604c): pre-recording checklist, DoD flow mapped across the six video sections (about 15 min), live-VPS commands, THREAT_MODEL rows to point at, Helm upgrade and 1-revision rollback explained (not executed).
+- Ticked the Demo box in `docs/PLAN.md` line 160, with a note that recording is not done.
+- `make lint`: ok. No command was run against the VPS (no ENV=prod, no urumi-vps context, no users or keys created).
 
-## Not covered by this run
-- README steps 4, 5 (Keys page UI), 6 are browser-only: placing an order, creating a key in the dashboard, and chat were not clicked through. I made the key through the API instead.
-- The optional LLM Secret command (step 2) was not run; chat was not tested.
-- Claude Code / Claude Desktop client snippets were not run.
+## In progress
+- Nothing half-finished. The recording itself is still to do (Ash).
 
 ## Next step
-`9 D Demo` (demo script against the live VPS, pre-flight checklist, record). Check the first CI run for `7cebe21` in the GitHub Actions tab first (`gh` is not installed).
+`9 D record`: Ash works through the checklist in `docs/DEMO_SCRIPT.md`, rehearses sections 1 and 3 once, then records. After that, only the submission form remains (https://forms.gle/nftwgyNeenSDmiRb6).
 
 ## Gotchas learned
-- A fresh `make cluster-up` + `make deploy` + `make register` takes a few minutes and needs no manual step in between.
-- `POST /api/keys` returns `{id, key, name}`; `/mcp` needs `Accept: application/json, text/event-stream` and an `mcp-session-id` from `initialize`.
+- ASSIGNMENT.md sets no video length limit; 15 min is my own budget.
+- `ENV=prod make dod` scales notes-mcp to 0 and disables fx itself: do not run it during the recording.
+- Disabling fx: the chat model may answer a currency question from memory. Prove it with the Audit page and the tool list (REHEARSAL row 11).
+- Cannot show live: a timeout (no slow tool), the two-upstream single prompt through an LLM client (never run), Claude Code/Desktop snippets (untested). Full list at the end of DEMO_SCRIPT.md.
+- Never delete TLS Secrets or the namespace on the VPS; roll back one Helm revision at most.
 
 ## Files the next task needs
-- docs/PLAN.md (Phase 9 section D), docs/REQUIREMENTS.md (six video sections), docs/REHEARSAL.md if present, README.md
+- docs/DEMO_SCRIPT.md (checklist and sections), docs/REHEARSAL.md only if a step fails
 
 ## Recent commits
+a0e604c docs: demo script
+32605a9 chore: handoff
 89ffdc7 chore: handoff
-7cebe21 ci: lint and tests on push and PR
-e3a18f6 chore: handoff
-4c6ef9f docs: readme local setup and stand-out list
