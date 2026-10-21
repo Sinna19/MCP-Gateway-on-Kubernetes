@@ -157,4 +157,4 @@ In this order:
 - [x] `.github/workflows/ci.yml`: on push and PR run `make lint` and `make test`; no cluster, no secrets; pinned action versions; npm cache; pinned helm binary if lint needs one
 
 ### D. Demo
-- [ ] Demo script following the six required video sections, run against the live https://app.20.197.63.44.sslip.io, with a pre-flight checklist (tunnel up, admin password from the gateway-app secret, clean browser profile so Chrome autofill can't lock you out); record
+- [x] Demo script following the six required video sections, run against the live https://app.20.197.63.44.sslip.io, with a pre-flight checklist (tunnel up, admin password from the gateway-app secret, clean browser profile so Chrome autofill can't lock you out); record (script written in docs/DEMO_SCRIPT.md; recording not done yet)
