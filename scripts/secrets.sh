@@ -4,6 +4,8 @@
 set -euo pipefail
 
 NS="${NS:-urumi}"
+# shellcheck source=lib/kube.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kube.sh"
 
 kubectl get ns "$NS" >/dev/null 2>&1 || kubectl create ns "$NS" >/dev/null
 

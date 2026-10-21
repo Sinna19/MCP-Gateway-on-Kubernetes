@@ -9,16 +9,12 @@ set -euo pipefail
 
 NS="${NS:-urumi}"
 BASE="${GATEWAY_URL:-http://app.localtest.me}"
-WANT_CONTEXT="${ROTATE_CONTEXT:-k3d-urumi}"
 WAIT="${ROTATE_WAIT:-90}"
 JOB=gateway-rotate-key
 
 # ---- guards (before any change: this script scales the gateway) ----
-ctx="$(kubectl config current-context | tr -d '\r')"
-if [ "$ctx" != "$WANT_CONTEXT" ]; then
-  echo "refusing to run: kubectl context is '$ctx', expected '$WANT_CONTEXT' (set ROTATE_CONTEXT to override)" >&2
-  exit 1
-fi
+# shellcheck source=lib/kube.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kube.sh"
 host="${BASE#*://}"; host="${host%%/*}"; host="${host%%:*}"
 case "$BASE" in
   https://*) ;;

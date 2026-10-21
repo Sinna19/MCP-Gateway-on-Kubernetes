@@ -5,6 +5,8 @@
 set -euo pipefail
 
 NS="${NS:-urumi}"
+# shellcheck source=lib/kube.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kube.sh"
 BASE="${GATEWAY_URL:-http://app.localtest.me}"
 
 # The admin password and the upstream tokens travel in these requests: plain http only for local hosts.

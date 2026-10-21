@@ -4,22 +4,18 @@
 # Two users: A = the admin, B = the fixed member dod-member@example.com (password in Secret dod-member).
 # Prints PASS/FAIL per check, never a key or a password. Exits 1 if any check failed.
 # The script scales notes-mcp and disables fx on purpose; the EXIT trap puts both back.
-# Env: NS (urumi), GATEWAY_URL (http://app.localtest.me), DOD_CONTEXT (k3d-urumi), DOD_WAIT (60 seconds).
+# Env: NS (urumi), GATEWAY_URL (http://app.localtest.me), KUBE_CONTEXT (k3d-urumi or urumi-vps), DOD_WAIT (60 seconds).
 set -euo pipefail
 
 NS="${NS:-urumi}"
 BASE="${GATEWAY_URL:-http://app.localtest.me}"
-WANT_CONTEXT="${DOD_CONTEXT:-k3d-urumi}"
 # The gateway pings upstreams every 5s (3s ping timeout), so a status flips within ~8s. 60s is far above 3x that.
 WAIT="${DOD_WAIT:-60}"
 B_EMAIL="dod-member@example.com"
 
 # ---- guards (before any kubectl call, because this script scales deployments) ----
-ctx="$(kubectl config current-context | tr -d '\r')"
-if [ "$ctx" != "$WANT_CONTEXT" ]; then
-  echo "refusing to run: kubectl context is '$ctx', expected '$WANT_CONTEXT' (set DOD_CONTEXT to override)" >&2
-  exit 1
-fi
+# shellcheck source=lib/kube.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kube.sh"
 # The admin password and API keys travel in these requests: plain http only for local hosts.
 host="${BASE#*://}"; host="${host%%/*}"; host="${host%%:*}"
 case "$BASE" in
