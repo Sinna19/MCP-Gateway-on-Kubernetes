@@ -22,7 +22,7 @@ Upstream servers are other people's code. Their tool descriptions, schemas and r
   - A tool name the model invents that is not in the user's tool list goes straight to `callTool`, which answers with an error and audits it. It is never a confirm card.
 - **UI renders plain text only** (6c): the reply, tool arguments and summaries are text nodes. No markdown, no links or images, no `dangerouslySetInnerHTML`. Otherwise an injected note could leak data through an image URL.
 - **Confirm card**: Confirm/Decline sit above the args, and displayed args are cut at 2 KB with "(truncated, N chars)", so padding cannot push the buttons away from the meaningful fields. Only the display is cut; the server runs the full stored args.
-- **What the audit log records**: each executed call (tool, user, outcome), not its args. Declines, invalid-argument calls, refused extra writes and calls skipped by the per-step cap or the deadline write no row, because no `callTool` runs. Parked for phase 7: an args column and `declined` rows.
+- **What the audit log records**: Superseded in part: tool args are now stored redacted, ≤2 KB, see `src/audit-args.ts` (ADR 015). Originally: each executed call (tool, user, outcome), not its args. Declines, invalid-argument calls, refused extra writes and calls skipped by the per-step cap or the deadline write no row, because no `callTool` runs. Parked for phase 7: an args column and `declined` rows.
 
 ## Alternatives considered
 - Trust MCP `readOnlyHint`: a malicious upstream could mark a write as read-only.
