@@ -100,6 +100,10 @@ describe("/mcp endpoint", () => {
       method: "POST",
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}`, "mcp-session-id": sessionId },
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+    }).then(async (res) => {
+      // The SSE headers arrive before the handler is done. Read the body so no query is still running when the test ends.
+      await res.text();
+      return res;
     });
 
   it("rejects a missing, malformed or unknown key with 401", async () => {
@@ -274,10 +278,10 @@ describe("/mcp endpoint", () => {
     await sendInitialized(alice.key, sessionId);
     expect(app.sessionCount()).toBe(1);
     clock += 29 * 60_000;
-    app.sweep();
+    await app.sweep();
     expect(app.sessionCount()).toBe(1);
     clock += 2 * 60_000;
-    app.sweep();
+    await app.sweep();
     expect(app.sessionCount()).toBe(0);
     expect((await listRequest(alice.key, sessionId)).status).toBe(404);
   });
@@ -309,10 +313,10 @@ describe("/mcp endpoint", () => {
     const full = await rawInitialize(bob.key);
     expect((await sendInitialized(bob.key, full)).status).toBeLessThan(300);
     clock += 50_000;
-    app.sweep();
+    await app.sweep();
     expect(app.sessionCount()).toBe(2); // still within the 60s grace
     clock += 11_000;
-    app.sweep();
+    await app.sweep();
     expect(app.sessionCount()).toBe(1);
     expect((await listRequest(alice.key, half)).status).toBe(404);
     expect((await listRequest(bob.key, full)).status).toBe(200);
@@ -323,7 +327,7 @@ describe("/mcp endpoint", () => {
     await rawInitialize(alice.key);
     expect((await initializeRaw(alice.key)).status).toBe(429);
     clock += 61_000;
-    app.sweep();
+    await app.sweep();
     expect((await initializeRaw(alice.key)).status).toBe(200);
   });
 

@@ -32,7 +32,7 @@ export interface App {
   express: Express;
   gateway: Gateway;
   sessionCount: () => number;
-  sweep: () => void;
+  sweep: () => Promise<void>; // resolves when the database purge (if it was due) has finished
   closeSessions: () => void;
 }
 
@@ -85,21 +85,21 @@ export function createApp(options: AppOptions): App {
 
   // Database cleanup is slow to matter, so it runs at most once an hour. The first sweep after start runs it.
   let lastPurge = Number.NEGATIVE_INFINITY;
-  const purge = () => {
-    Promise.all([deleteExpiredSessions(pool), purgeOldChatUsage(pool, now)]).then(
-      ([sessions]) => console.log(`swept ${sessions} expired sessions`), // the count only
-      (err: unknown) => console.error("purge failed:", err instanceof Error ? err.message : err),
-    );
+  // allSettled, not all: the returned promise must mean both deletes are finished, even if one failed.
+  const purge = async (): Promise<void> => {
+    const [sessions, usage] = await Promise.allSettled([deleteExpiredSessions(pool), purgeOldChatUsage(pool, now)]);
+    if (sessions.status === "fulfilled" && usage.status === "fulfilled") console.log(`swept ${sessions.value} expired sessions`); // the count only
+    for (const r of [sessions, usage]) if (r.status === "rejected") console.error("purge failed:", r.reason instanceof Error ? r.reason.message : r.reason);
   };
 
-  const sweep = () => {
+  const sweep = async (): Promise<void> => {
     mcp.sweep();
     login.ip.sweep();
     login.email.sweep();
     keyUsage.sweep();
     if (now() - lastPurge >= PURGE_EVERY_MS) {
       lastPurge = now();
-      purge();
+      await purge();
     }
   };
   return { express: app, gateway, sessionCount: mcp.sessionCount, sweep, closeSessions: mcp.closeAll };
