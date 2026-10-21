@@ -1,19 +1,23 @@
 # Handoff
-## Done this session (Phase 9, B: result size cap + threat model follow-ups)
-- `2facf8a` fix(gateway): tool results over `MAX_TOOL_RESULT_BYTES` (1 MB default) become an error result + audit row, SSE and JSON upstreams. Tests first (`mcp-endpoint`, `config`); `FakeUpstream` got a `jsonResponse` option. Chat now errors on >1 MB results instead of cutting to 8000 chars.
-- `7152f86` docs: threat model follow-ups: cap row mitigated with the memory exposure (256Mi limit), `/mcp` passthrough accepted, Q2/Q3 wording matches the code (no IP pinning, port not restricted), two new rows (LLM provider PII, Postgres dumps), ADR 018 audit note, image row pointer clarified, PLAN box added.
-- Row count was 18, not 19: a miscount in the old handoff, nothing dropped.
-- `make lint`, `make test` ok; `make deploy` + `make dod`: 8 passed, 0 failed.
+## Done this session (Phase 9, B: DESIGN.md + future work)
+- `65ddbb2` docs: new `docs/DESIGN.md` with six sections: architecture (mermaid + ownership table), aggregation/routing, auth/roles, failure handling, local vs prod (from `deploy/values-prod.yaml`), future work + skipped bonuses. Future work is its last section; both PLAN boxes ticked. `make lint` ok.
+- Claims were checked against code/ADRs by grep. Judgement calls Ash should confirm before the demo: the "skipped bonuses" reasons, and that observability and upgrades/rollback are listed as not attempted.
 
 ## In progress
 - Nothing half-finished.
 
 ## Next step
-`9 B Future-work section`: PLAN.md "Future-work section" box (already lists the byte-counting cap in `limitedFetch`): admin one-time password reset link, disabled-login hint, agent system-prompt line, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons.
+Rest of Phase 9 (see PLAN.md Phase 9 unchecked boxes): README (README has no stand-out list yet; DESIGN's last line says "Attempted instead", so the README list should match it), demo video.
 
 ## Gotchas learned
-- ADR 023 does contain "Images by digest"; 024 only covers side-loading. The earlier "wrong pointer" suspicion was wrong.
-- The cap is checked after the body is buffered, so it does not bound gateway memory (rules/gateway.md has the line).
+- README currently has no stand-out section; PLAN lists it as a Phase 9 item.
+- No admin password-reset exists and a disabled login returns the generic 401 (`api/auth.ts`); both are in Future work.
 
 ## Files the next task needs
-- docs/PLAN.md (Future-work box, line ~150), docs/THREAT_MODEL.md (where the section goes), docs/REQUIREMENTS.md (bonus list only)
+- docs/PLAN.md (Phase 9 section), docs/REQUIREMENTS.md, README.md
+
+## Recent commits
+65ddbb2 docs: design and future work
+22d0e81 chore: handoff
+7152f86 docs: threat model follow-ups
+2facf8a fix(gateway): cap tool-result size on /mcp
