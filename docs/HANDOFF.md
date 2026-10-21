@@ -1,17 +1,18 @@
 # Handoff
-## Done this session (Phase 9, A3 — group A is complete)
-- `8406b61` restore-check takes a fresh backup first: Job `gateway-backup-for-check` from the CronJob, wait up to 900 s, `MIN_DUMP` (Job startTime in dump-name form) passed to the pod, which fails with `stale dump` if the newest dump is older. `SKIP_BACKUP=1` keeps the old behaviour. EXIT trap deletes the Job. ADR 025 line, kubernetes.md restore-check line and PLAN A3 box updated.
-- Proof on k3d: after `make dod` (8 passed) `SKIP_BACKUP=1 make restore-check` gave `DIFF audit_log live=126 restored=120`; `make restore-check` gave `restoring /backups/gateway-20261021T140801Z.dump` + `RESTORE CHECK: PASS`; no `for-check` Job left. `make lint` and `make test` ok.
+## Done this session (Phase 9, B1: threat model)
+- `291b4cf` docs: `docs/THREAT_MODEL.md`: the four required questions (shared credentials, no token passthrough, untrusted upstreams, member vs member) and a 19-row Known risks table (8 PLAN lines incl. mu-plugin X-Forwarded-For, plus the known weak spots). PLAN box ticked. `make lint` ok.
+- Every mitigation was grepped in code first. Two honest "not mitigated" entries came out of it: `/mcp` passes upstream tool descriptions and results to external clients unchanged (only chat sanitises), and the gateway does not cap raw tool-result size on `/mcp`.
 
 ## In progress
-- Nothing half-finished. Working tree is clean after this commit. No `ENV=prod` run was done.
+- Nothing half-finished. Working tree clean after this commit.
 
 ## Next step
-`9 B THREAT_MODEL.md` (first unchecked box of group B in PLAN.md Phase 9; the later B boxes are separate sessions).
+`9 B Future-work section` (next unchecked B box: admin one-time password reset link, disabled-login hint, agent system-prompt line, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons). Likely appended to THREAT_MODEL.md or DESIGN.md; check PLAN wording.
 
 ## Gotchas learned
-- Editing a script with a python heredoc through Bash mangled `\n`, `\r`, `\$` and left a literal CR byte; use the Edit tool for escape-heavy lines. Check with `grep -c $'\r' file` (must be 0).
-- `make dod` takes ~6.5 min; run it in the background and wait for the notification.
+- ADR 018 says audit records no args, but that is outdated: `src/audit-args.ts` now stores redacted args (<= 2 KB) and `declined` rows exist (ADR 015). The threat model follows the code.
+- Some ADR files (024) contain non-UTF-8 bytes; Read shows U+FFFD and Edit/Write will refuse them. Grep or use shell for those.
+- Bash `cd` into a subfolder persists; use absolute paths or `cd` back.
 
 ## Files the next task needs
-- docs/PLAN.md (Phase 9 B boxes), docs/ASSIGNMENT.md (security questions only), docs/decisions/011, 014, 019, 024
+- docs/PLAN.md (Phase 9 B boxes), docs/THREAT_MODEL.md, docs/REQUIREMENTS.md (bonus list only)
