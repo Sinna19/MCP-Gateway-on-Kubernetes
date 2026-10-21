@@ -140,8 +140,8 @@ In this order:
 ## Phase 9: Docs + demo
 
 ### A. Fixes (do first; CI and the demo depend on them)
-- [ ] Fix flaky `test/mcp-endpoint.test.ts`: find the root cause (timing, port, shared state or ordering), no retries or skips; proof: 20 consecutive green runs of the file and 5 of full `make test`
-- [ ] Guard hook polish: no false deny when a command ends in a backtick; file names like push-images.sh or ENV=prod as plain text inside read-only commands (grep, cat, git log/diff, ls) must not prompt; hook tests for both plus regression cases proving real ENV=prod deploy/delete/ssh commands still prompt
+- [x] Fix flaky `test/mcp-endpoint.test.ts`: find the root cause (timing, port, shared state or ordering), no retries or skips; proof: 20 consecutive green runs of the file and 5 of full `make test`
+- [x] Guard hook polish: no false deny when a command ends in a backtick; file names like push-images.sh or ENV=prod as plain text inside read-only commands (grep, cat, git log/diff, ls) must not prompt; hook tests for both plus regression cases proving real ENV=prod deploy/delete/ssh commands still prompt
 - [ ] restore-check takes a fresh backup first (Job from the backup CronJob, wait, then compare the newest dump to the live DB)
 
 ### B. Docs

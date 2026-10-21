@@ -5,15 +5,36 @@
 #   anything touching urumi-vps -> ask (explicit context, ENV=prod, KUBE_CONTEXT=urumi-vps, KUBECONFIG=, push-images, k3s ctr)
 #   any other explicit context  -> deny
 #   no context named            -> allow if the current context is k3d-*, else deny
+#   segments of read-only commands (grep, cat, ls, git log...) are ignored unless they run something: a prod name as text is fine
 # GUARD_CURRENT_CONTEXT replaces `kubectl config current-context`; the fixture tests use it.
-input=$(cat)
+input=$(</dev/stdin) # no `cat`: process start is slow on Windows
 cmd=$(jq -r '.tool_input.command // ""' <<<"$input")
 
-mutating='(^|[;&| ])(kubectl[^;&|]*[[:space:]](apply|delete|patch|scale|edit|replace|rollout[[:space:]]+restart|create|drain|cordon|uncordon|taint|exec|cp|label|annotate|set|run|rollout[[:space:]]+undo)|helm[^;&|]*[[:space:]](install|upgrade|uninstall|rollback))([[:space:]]|$)'
+# Read-only commands (grep, cat, ls, head, tail, less, wc, rg; git log|diff|show|status|grep|blame) only show text, so a prod
+# name inside them is not an action. Their segments are dropped before matching, unless they run something ($( ` <( >( ).
+# git is matched only as `git <sub>`: `git -C dir log` stays scanned (stricter is fine). bash builtins only, no extra spawns.
+scan=""
+t=$cmd
+for sep in '&&' '||' ';' '&' '|'; do t=${t//"$sep"/$'\n'}; done
+while IFS= read -r seg; do
+  read -r w1 w2 _ <<<"$seg"
+  readonly_cmd=0
+  case "$w1" in
+    grep | rg | cat | head | tail | less | ls | wc) readonly_cmd=1 ;;
+    git) case "$w2" in log | diff | show | status | grep | blame) readonly_cmd=1 ;; esac ;;
+  esac
+  case "$seg" in *'$('* | *'`'* | *'<('* | *'>('*) readonly_cmd=0 ;; esac
+  [ "$readonly_cmd" = 0 ] && scan+="$seg"$'\n'
+done <<<"$t"
+
+# The patterns run with [[ =~ ]] (same ERE as grep -E, no process to start). $scan has one segment per line, so a newline
+# counts as a separator, like ; & |. A backtick or ( before the command also counts: `kubectl ...` and $(kubectl ...) run it.
+nl=$'\n'
+mutating="(^|[;&| $nl\`(])(kubectl[^;&|$nl]*[[:space:]](apply|delete|patch|scale|edit|replace|rollout[[:space:]]+restart|create|drain|cordon|uncordon|taint|exec|cp|label|annotate|set|run|rollout[[:space:]]+undo)|helm[^;&|$nl]*[[:space:]](install|upgrade|uninstall|rollback))([[:space:]]|\$)"
 # Commands that act on the VPS without a kubectl/helm verb in them. A read-only kubectl on urumi-vps is not one.
-vps_action='ENV=prod|KUBE_CONTEXT=urumi-vps|push-images\.sh|k3s[[:space:]]+(ctr|kubectl)|ssh[^;&|]*azureuser@'
+vps_action="ENV=prod|KUBE_CONTEXT=urumi-vps|push-images\.sh|k3s[[:space:]]+(ctr|kubectl)|ssh[^;&|$nl]*azureuser@"
 prod_marker="$vps_action|KUBECONFIG=|urumi-vps"
-if ! grep -Eq -- "$mutating|$vps_action" <<<"$cmd"; then
+if ! [[ $scan =~ $mutating || $scan =~ $vps_action ]]; then
   exit 0
 fi
 
@@ -23,7 +44,14 @@ raise() { # raise <ask|deny> <reason>: keep the strictest decision
   if [ "$1" = deny ] || [ "$decision" = allow ]; then decision="$1"; reason="$2"; fi
 }
 
-named=$(grep -Eo -- '--(kube-)?context[= ]+[^[:space:];&|]+' <<<"$cmd" | sed -E 's/^--(kube-)?context[= ]+//' | tr -d "\"'")
+named=""
+rest=$scan
+context_re='--(kube-)?context[= ]+([^[:space:];&|)]+)'
+while [[ $rest =~ $context_re ]]; do
+  c=${BASH_REMATCH[2]}
+  named+="${named:+ }${c//[\"\'\`]/}" # strip the three quote characters " ' `
+  rest=${rest#*"${BASH_REMATCH[0]}"}
+done
 for c in $named; do
   case "$c" in
     k3d-*) ;;
@@ -32,7 +60,7 @@ for c in $named; do
   esac
 done
 
-if [ "$decision" = allow ] && grep -Eq -- "$prod_marker" <<<"$cmd"; then
+if [ "$decision" = allow ] && [[ $scan =~ $prod_marker ]]; then
   raise ask "Command touches the VPS (ENV=prod, urumi-vps, KUBECONFIG, push-images or k3s ctr); confirm it is intended."
 fi
 
