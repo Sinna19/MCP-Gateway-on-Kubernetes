@@ -16,6 +16,11 @@ B_EMAIL="dod-member@example.com"
 # ---- guards (before any kubectl call, because this script scales deployments) ----
 # shellcheck source=lib/kube.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib/kube.sh"
+# This script scales notes-mcp and leaves the member dod-member on the cluster: only k3d without asking (ADR 024).
+case "$KUBE_CONTEXT" in
+  k3d-*) ;;
+  *) [ "${DOD_ALLOW_PROD:-}" = 1 ] || { echo "refusing to run against '$KUBE_CONTEXT': set DOD_ALLOW_PROD=1 (make dod ENV=prod does) to check the VPS on purpose" >&2; exit 1; } ;;
+esac
 # The admin password and API keys travel in these requests: plain http only for local hosts.
 host="${BASE#*://}"; host="${host%%/*}"; host="${host%%:*}"
 case "$BASE" in

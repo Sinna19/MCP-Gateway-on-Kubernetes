@@ -9,9 +9,9 @@
 input=$(cat)
 cmd=$(jq -r '.tool_input.command // ""' <<<"$input")
 
-mutating='(^|[;&| ])(kubectl[^;&|]*[[:space:]](apply|delete|patch|scale|edit|replace|rollout[[:space:]]+restart|create|drain|cordon)|helm[^;&|]*[[:space:]](install|upgrade|uninstall|rollback))([[:space:]]|$)'
+mutating='(^|[;&| ])(kubectl[^;&|]*[[:space:]](apply|delete|patch|scale|edit|replace|rollout[[:space:]]+restart|create|drain|cordon|uncordon|taint|exec|cp|label|annotate|set|run|rollout[[:space:]]+undo)|helm[^;&|]*[[:space:]](install|upgrade|uninstall|rollback))([[:space:]]|$)'
 # Commands that act on the VPS without a kubectl/helm verb in them. A read-only kubectl on urumi-vps is not one.
-vps_action='ENV=prod|KUBE_CONTEXT=urumi-vps|push-images\.sh|k3s[[:space:]]+ctr'
+vps_action='ENV=prod|KUBE_CONTEXT=urumi-vps|push-images\.sh|k3s[[:space:]]+(ctr|kubectl)|ssh[^;&|]*azureuser@'
 prod_marker="$vps_action|KUBECONFIG=|urumi-vps"
 if ! grep -Eq -- "$mutating|$vps_action" <<<"$cmd"; then
   exit 0

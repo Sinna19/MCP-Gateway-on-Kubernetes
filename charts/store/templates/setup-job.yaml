@@ -13,6 +13,8 @@ spec:
   activeDeadlineSeconds: 900
   template:
     metadata:
+      annotations:
+        checksum/mu-plugin: {{ include (print $.Template.BasePath "/mu-plugin-configmap.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/name: setup
         {{- include "store.labels" . | nindent 8 }}

@@ -141,6 +141,7 @@ In this order:
 - [ ] README: local setup, VPS setup, place an order, connect an MCP client, use chat
 - [ ] `docs/DESIGN.md` (architecture, aggregation, routing, failure handling, prod changes)
 - [ ] `docs/THREAT_MODEL.md` (the four required questions)
+  - include: mu-plugin trusts missing X-Forwarded-For; safe only while store NetworkPolicy limits direct callers to woo-mcp + setup Job (ADR 024)
 - [ ] GitHub Actions CI: make lint + tests on every push (stand-out item)
 - [ ] Stand-out items list with file pointers
 - [ ] Stand-out list: #1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI.

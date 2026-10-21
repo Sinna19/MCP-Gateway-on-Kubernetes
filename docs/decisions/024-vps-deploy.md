@@ -35,3 +35,7 @@ Both Certificates (`gateway-tls`, `store-wordpress-tls`) became Ready on the fir
 - Upgrade: `ENV=prod make deploy HELM_EXTRA="--set gateway.limits.mcp.callsPerMinute=61"` -> revision 4 deployed, new pod `gateway-56d694fcd4-xpgzj` Running with value 61, `curl -sI https://app.20.197.63.44.sslip.io/healthz` 200.
 - Rollback: `helm rollback platform 3 -n urumi --wait` -> revision 5 "Rollback to 3", new pod `gateway-64769f79bc-f67r2` Running with value 60, `gateway-tls` and `store-wordpress-tls` Ready on `letsencrypt-prod`, healthz 200, `ENV=prod make dod` 9 passed, 0 failed.
 - Rule kept: one revision back only, never at or before the prod-issuer flip or the backup revision; no TLS Secret or namespace deleted.
+
+## `make dod` on the VPS (review fix, 2026-10-21)
+- `scripts/dod-check.sh` refuses any context that is not `k3d-*` unless `DOD_ALLOW_PROD=1`. `ENV=prod make dod` sets it, so checking the public hostname stays possible but is a deliberate act.
+- By design a user `dod-member@example.com` (role member) and Secret `dod-member` exist on the VPS gateway. The script reuses them on every run; only its API keys are revoked afterwards. notes-mcp replicas and fx enabled state are restored by the EXIT trap.

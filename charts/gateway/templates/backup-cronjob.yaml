@@ -13,8 +13,11 @@ spec:
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
+  # A hung pg_dump must not keep the Job Active: with Forbid that would skip every later night silently.
+  startingDeadlineSeconds: 3600
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 900
       backoffLimit: 1
       template:
         metadata:
@@ -59,6 +62,7 @@ spec:
                 - -c
                 - |
                   set -eu
+                  umask 077
                   # A new pod's IP is refused by the NetworkPolicy for a few seconds, so wait for Postgres.
                   for i in $(seq 30); do pg_isready -q && break; sleep 2; done
                   f=/backups/gateway-$(date -u +%Y%m%dT%H%M%SZ).dump

@@ -26,6 +26,15 @@ check ask  k3d-urumi 'make deploy ENV=prod'
 check ask  k3d-urumi 'ENV=prod make secrets'
 check ask  k3d-urumi 'KUBECONFIG=~/.kube/urumi-vps.yaml kubectl scale deploy/gateway --replicas=0'
 check ask  k3d-urumi 'ssh azureuser@20.197.63.44 sudo k3s ctr images import -'
+check ask  k3d-urumi 'ssh -i k azureuser@20.197.63.44 sudo k3s kubectl get pods'
+check ask  k3d-urumi 'ssh azureuser@20.197.63.44 uptime'
+check ask  k3d-urumi 'kubectl --context urumi-vps exec -n urumi gateway-postgres-0 -- ls'
+check allow k3d-urumi 'kubectl exec -n urumi gateway-postgres-0 -- ls'
+check allow k3d-urumi 'kubectl --context k3d-urumi label pod x a=b'
+check allow k3d-urumi 'kubectl -n urumi get pods -l app=run'
+for v in 'exec p -- ls' 'cp p:/a /tmp/a' 'label pod x a=b' 'annotate pod x a=b' 'set image deploy/x c=i' 'run x --image=i' 'taint node n k=v:NoSchedule' 'uncordon n' 'rollout undo deploy/x'; do
+  check deny docker-desktop "kubectl $v"
+done
 check deny k3d-urumi 'kubectl --context foo delete ns x'
 check deny k3d-urumi 'helm --kube-context prod-eks upgrade x y'
 check deny k3d-urumi 'kubectl --context k3d-urumi apply -f x && kubectl --context foo delete ns x'

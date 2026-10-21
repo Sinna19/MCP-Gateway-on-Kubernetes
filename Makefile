@@ -55,7 +55,7 @@ DASHBOARD_TAG := $(shell git rev-parse --short HEAD:apps/dashboard)
 # Build service images and import them into k3d (cached builds are fast).
 images:
 ifeq ($(ENV),prod)
-	@echo "images for prod need scripts/push-images.sh (session 2)" >&2; exit 1
+	@echo "images for prod: build with ENV=local make images, then ENV=prod make push-images" >&2; exit 1
 endif
 	docker build -q -t urumi/woo-mcp:$(WOO_MCP_TAG) services/woo-mcp
 	k3d image import -c urumi urumi/woo-mcp:$(WOO_MCP_TAG)
@@ -86,6 +86,7 @@ push-images:
 ifneq ($(ENV),prod)
 	@echo "push-images is for ENV=prod; locally use make images (k3d image import)" >&2; exit 1
 endif
+	@[ -z "$$(git status --porcelain services apps)" ] || { echo "push-images: uncommitted changes in services/ or apps/: commit first, image tags are git tree hashes" >&2; exit 1; }
 	IMAGES="urumi/woo-mcp:$(WOO_MCP_TAG) urumi/gateway:$(GATEWAY_TAG) urumi/fx-mcp:$(FX_MCP_TAG) urumi/notes-mcp:$(NOTES_MCP_TAG) urumi/dashboard:$(DASHBOARD_TAG)" scripts/push-images.sh
 
 deps:
@@ -137,8 +138,9 @@ test:
 	done; \
 	if [ $$fail = 0 ]; then echo "test: ok"; else echo "test: FAILED"; exit 1; fi
 
+# On prod the DoD must run at the public hostname, so ENV=prod sets DOD_ALLOW_PROD on purpose (dod-check refuses non-k3d contexts otherwise).
 dod:
-	scripts/dod-check.sh
+	DOD_ALLOW_PROD=$(if $(filter prod,$(ENV)),1) scripts/dod-check.sh
 
 # Re-encrypts the stored upstream credentials under a new CREDENTIALS_KEY (ADR 023). The gateway is down ~30s.
 rotate-key:

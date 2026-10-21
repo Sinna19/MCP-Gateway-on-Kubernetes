@@ -15,6 +15,8 @@ spec:
       app.kubernetes.io/name: wordpress
   template:
     metadata:
+      annotations:
+        checksum/mu-plugin: {{ include (print $.Template.BasePath "/mu-plugin-configmap.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/name: wordpress
         {{- include "store.labels" . | nindent 8 }}
