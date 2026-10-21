@@ -154,7 +154,7 @@ In this order:
 - [x] Stand-out items list with file pointers (#1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI)
 
 ### C. CI (cut first if time is tight)
-- [ ] `.github/workflows/ci.yml`: on push and PR run `make lint` and `make test`; no cluster, no secrets; pinned action versions; npm cache; pinned helm binary if lint needs one
+- [x] `.github/workflows/ci.yml`: on push and PR run `make lint` and `make test`; no cluster, no secrets; pinned action versions; npm cache; pinned helm binary if lint needs one
 
 ### D. Demo
 - [ ] Demo script following the six required video sections, run against the live https://app.20.197.63.44.sslip.io, with a pre-flight checklist (tunnel up, admin password from the gateway-app secret, clean browser profile so Chrome autofill can't lock you out); record

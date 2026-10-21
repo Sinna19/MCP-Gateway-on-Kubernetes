@@ -149,4 +149,4 @@ Also built:
 
 - **Postgres backups and restore check:** CronJob dump to a PVC, `make backup-pull` copies it off the box, `make restore-check` takes a fresh backup and proves it restores (ADR 025).
 - **Tool-result size cap on `/mcp`:** `MAX_TOOL_RESULT_BYTES`, default 1 MB (`services/gateway/src/config.ts`, `docs/THREAT_MODEL.md`).
-- **CI:** TODO, no workflow yet (`.github/workflows/ci.yml` is planned).
+- **CI:** `.github/workflows/ci.yml` runs `make lint`, `make test` and the hook tests on every push to main and every pull request (no cluster, no secrets).

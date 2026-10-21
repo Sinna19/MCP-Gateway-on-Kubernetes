@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            services/*/package-lock.json
+            apps/dashboard/package-lock.json
+
+      # Same helm version as the dev machine. lint only renders templates, no cluster is needed.
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+
+      - name: Install npm dependencies
+        run: |
+          for d in services/woo-mcp services/gateway services/fx-mcp services/notes-mcp apps/dashboard; do
+            npm --prefix "$d" ci --no-audit --no-fund
+          done
+
+      - run: make lint
+
+      # The gateway tests start their own throwaway Postgres with `docker run` (test/global-setup.ts); the runner has Docker.
+      - run: make test
+
+      - run: bash .claude/hooks/test-guard-kube-context.sh
