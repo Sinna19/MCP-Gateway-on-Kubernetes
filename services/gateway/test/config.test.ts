@@ -18,6 +18,12 @@ describe("loadConfig", () => {
     expect(config.callTimeoutMs).toBe(15_000);
     expect(config.healthIntervalMs).toBe(5_000);
   });
+  it("reads the tool-result cap: 1 MB by default, empty means default, junk fails at start", () => {
+    expect(loadConfig(valid).maxResultBytes).toBe(1_048_576);
+    expect(loadConfig({ ...valid, MAX_TOOL_RESULT_BYTES: "" }).maxResultBytes).toBe(1_048_576);
+    expect(loadConfig({ ...valid, MAX_TOOL_RESULT_BYTES: "5000" }).maxResultBytes).toBe(5000);
+    expect(() => loadConfig({ ...valid, MAX_TOOL_RESULT_BYTES: "abc" })).toThrow(/MAX_TOOL_RESULT_BYTES/);
+  });
   it("names every missing variable, never their values", () => {
     expect(() => loadConfig({ DATABASE_URL: "postgres://secret" })).toThrow(/CREDENTIALS_KEY.*ADMIN_EMAIL/);
     expect(() => loadConfig({ DATABASE_URL: "postgres://secret" })).not.toThrow(/secret/);

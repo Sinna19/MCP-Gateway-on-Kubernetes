@@ -46,6 +46,7 @@ export interface UpstreamManagerOptions {
   pool: pg.Pool;
   credentialsKey: Buffer;
   callTimeoutMs?: number; // longer than woo-mcp's own 10s, so woo's clear error arrives first
+  maxResultBytes?: number; // a tool result bigger than this (as JSON) becomes an error; default 1 MB
   connectTimeoutMs?: number;
   pingTimeoutMs?: number;
   intervalMs?: number;
@@ -64,6 +65,7 @@ export class UpstreamManager extends EventEmitter {
   private readonly pool: pg.Pool;
   private readonly key: Buffer;
   private readonly callTimeoutMs: number;
+  private readonly maxResultBytes: number;
   private readonly connectTimeoutMs: number;
   private readonly pingTimeoutMs: number;
   private readonly intervalMs: number;
@@ -75,6 +77,7 @@ export class UpstreamManager extends EventEmitter {
     this.pool = options.pool;
     this.key = options.credentialsKey;
     this.callTimeoutMs = options.callTimeoutMs ?? 15_000;
+    this.maxResultBytes = options.maxResultBytes ?? 1_048_576;
     this.connectTimeoutMs = options.connectTimeoutMs ?? 5_000;
     this.pingTimeoutMs = options.pingTimeoutMs ?? 3_000;
     this.intervalMs = options.intervalMs ?? 5_000;
@@ -160,9 +163,10 @@ export class UpstreamManager extends EventEmitter {
     if (!entry) throw new UpstreamError(`server '${slug}' not found`);
     if (entry.status === "disabled") throw new UpstreamError(`server '${slug}' is disabled`);
     if (entry.status !== "connected" || !entry.client) throw new UpstreamError(`server '${slug}' is unreachable`);
+    let result: CallToolResult;
     try {
-      const result = await entry.client.callTool({ name: tool, arguments: args }, CallToolResultSchema, { timeout: this.callTimeoutMs });
-      return CallToolResultSchema.parse(result);
+      const raw = await entry.client.callTool({ name: tool, arguments: args }, CallToolResultSchema, { timeout: this.callTimeoutMs });
+      result = CallToolResultSchema.parse(raw);
     } catch (err) {
       if (err instanceof McpError && err.code === ErrorCode.RequestTimeout) {
         throw new UpstreamError(`server '${slug}' timed out after ${this.callTimeoutMs / 1000}s`);
@@ -171,6 +175,13 @@ export class UpstreamManager extends EventEmitter {
       console.warn(`upstream '${slug}' call to '${tool}' failed: ${err instanceof Error ? err.message : String(err)}`);
       throw new UpstreamError(`server '${slug}' failed`);
     }
+    // Same for SSE and JSON replies. The body is already in memory here; the call timeout bounds how much arrives.
+    const size = Buffer.byteLength(JSON.stringify(result));
+    if (size > this.maxResultBytes) {
+      console.warn(`upstream '${slug}' call to '${tool}' returned ${size} bytes, over the cap`);
+      throw new UpstreamError(`server '${slug}' returned a result over ${this.maxResultBytes} bytes`);
+    }
+    return result;
   }
 
   private async connect(entry: Entry): Promise<void> {

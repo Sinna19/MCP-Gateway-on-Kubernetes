@@ -10,7 +10,7 @@ const pool = createPool(config.databaseUrl);
 await migrate(pool);
 await bootstrap(pool, { adminEmail: config.adminEmail, adminPassword: config.adminPassword, wooUrl: config.seedWooUrl });
 
-const upstreams = new UpstreamManager({ pool, credentialsKey: config.credentialsKey, callTimeoutMs: config.callTimeoutMs, intervalMs: config.healthIntervalMs });
+const upstreams = new UpstreamManager({ pool, credentialsKey: config.credentialsKey, callTimeoutMs: config.callTimeoutMs, maxResultBytes: config.maxResultBytes,intervalMs: config.healthIntervalMs });
 await upstreams.reload();
 upstreams.start();
 

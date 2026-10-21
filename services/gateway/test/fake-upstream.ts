@@ -18,7 +18,11 @@ export class FakeUpstream {
   private port = 0;
   private sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
 
-  constructor(private tools: Record<string, ToolHandler>) {}
+  // jsonResponse: answer each POST with one JSON body instead of an SSE stream (the two shapes a real upstream may use).
+  constructor(
+    private tools: Record<string, ToolHandler>,
+    private options: { jsonResponse?: boolean } = {},
+  ) {}
 
   count(method: string): number {
     return this.methods.filter((m) => m === method).length;
@@ -69,6 +73,7 @@ export class FakeUpstream {
       for (const [name, handler] of Object.entries(this.tools)) this.register(server, name, handler);
       const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
         sessionIdGenerator: randomUUID,
+        enableJsonResponse: this.options.jsonResponse,
         onsessioninitialized: (id: string) => {
           this.sessions.set(id, { transport, server });
         },

@@ -57,7 +57,7 @@ describe("/mcp endpoint", () => {
     alice = await makeUser("alice@x.io");
     bob = await makeUser("bob@x.io");
     const credentialsKey = randomBytes(32);
-    manager = new UpstreamManager({ pool, credentialsKey, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300, allowLoopback: true });
+    manager = new UpstreamManager({ pool, credentialsKey, callTimeoutMs: 500, connectTimeoutMs: 500, pingTimeoutMs: 300, maxResultBytes: 2000, allowLoopback: true });
     await manager.reload();
     app = createApp({ pool, upstreams: manager, credentialsKey, now: () => clock, idleMs: 30 * 60_000, limits: { loginPerEmail: 5, loginPerIp: 30, loginWindowMs: 900_000, mcpCallsPerMinute: 3, mcpSessionsPerKey: 2, chatDailyCap: 200 } });
     http = await new Promise<Server>((resolve) => {
@@ -155,6 +155,33 @@ describe("/mcp endpoint", () => {
     const result = await client.callTool({ name: "woo__slow", arguments: {} });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain("server 'woo' timed out after 0.5s");
+  });
+
+  it("replaces a tool result over the cap (2000 bytes in this suite) with an error, for SSE and JSON upstreams; a small one passes unchanged", async () => {
+    const big = () => "x".repeat(5000);
+    woo.addTool("big", big);
+    const json = new FakeUpstream({ big }, { jsonResponse: true });
+    await json.start();
+    try {
+      await pool.query("INSERT INTO upstream_servers (slug, url) VALUES ('json', $1)", [json.url]);
+      await manager.reload();
+      await waitFor(() => ["woo__big", "json__big"].every((n) => manager.tools().some((t) => t.name === n)));
+      const client = await connect(alice.key); // 3 calls: exactly this suite's limit
+      for (const name of ["woo__big", "json__big"]) {
+        const result = await client.callTool({ name, arguments: {} });
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toMatch(/over 2000 bytes/);
+        expect(JSON.stringify(result.content)).not.toContain("xxxx");
+      }
+      const small = await client.callTool({ name: "woo__list_orders", arguments: { text: "ok" } });
+      expect(small.isError).toBeFalsy();
+      expect(small.content).toEqual([{ type: "text", text: "orders ok" }]);
+      const { rows } = await pool.query("SELECT tool, outcome, error FROM audit_log ORDER BY id");
+      expect(rows.map((r) => [r.tool, r.outcome])).toEqual([["big", "error"], ["big", "error"], ["list_orders", "ok"]]);
+      expect(rows[0].error).toMatch(/over 2000 bytes/);
+    } finally {
+      await json.stop();
+    }
   });
 
   it("never forwards the client's key to an upstream", async () => {

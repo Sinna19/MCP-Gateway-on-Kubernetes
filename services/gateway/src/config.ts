@@ -8,6 +8,7 @@ export interface Config {
   seedWooUrl: string;
   port: number;
   callTimeoutMs: number;
+  maxResultBytes: number;
   healthIntervalMs: number;
   cookieSecure: boolean;
   llm?: { baseUrl: string; model: string; apiKey: string }; // unset = chat answers 503
@@ -30,6 +31,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     seedWooUrl: env.SEED_WOO_URL!,
     port: Number(env.PORT ?? 8080),
     callTimeoutMs: Number(env.CALL_TIMEOUT_MS ?? 15_000),
+    maxResultBytes: positiveInt(env, "MAX_TOOL_RESULT_BYTES", 1_048_576),
     healthIntervalMs: Number(env.HEALTH_INTERVAL_MS ?? 5_000),
     cookieSecure: env.COOKIE_SECURE === "true",
     llm: loadLlm(env),
