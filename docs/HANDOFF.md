@@ -1,18 +1,19 @@
 # Handoff
-## Done this session (Phase 9, B1: threat model)
-- `291b4cf` docs: `docs/THREAT_MODEL.md`: the four required questions (shared credentials, no token passthrough, untrusted upstreams, member vs member) and a 19-row Known risks table (8 PLAN lines incl. mu-plugin X-Forwarded-For, plus the known weak spots). PLAN box ticked. `make lint` ok.
-- Every mitigation was grepped in code first. Two honest "not mitigated" entries came out of it: `/mcp` passes upstream tool descriptions and results to external clients unchanged (only chat sanitises), and the gateway does not cap raw tool-result size on `/mcp`.
+## Done this session (Phase 9, B: result size cap + threat model follow-ups)
+- `2facf8a` fix(gateway): tool results over `MAX_TOOL_RESULT_BYTES` (1 MB default) become an error result + audit row, SSE and JSON upstreams. Tests first (`mcp-endpoint`, `config`); `FakeUpstream` got a `jsonResponse` option. Chat now errors on >1 MB results instead of cutting to 8000 chars.
+- `7152f86` docs: threat model follow-ups: cap row mitigated with the memory exposure (256Mi limit), `/mcp` passthrough accepted, Q2/Q3 wording matches the code (no IP pinning, port not restricted), two new rows (LLM provider PII, Postgres dumps), ADR 018 audit note, image row pointer clarified, PLAN box added.
+- Row count was 18, not 19: a miscount in the old handoff, nothing dropped.
+- `make lint`, `make test` ok; `make deploy` + `make dod`: 8 passed, 0 failed.
 
 ## In progress
-- Nothing half-finished. Working tree clean after this commit.
+- Nothing half-finished.
 
 ## Next step
-`9 B Future-work section` (next unchecked B box: admin one-time password reset link, disabled-login hint, agent system-prompt line, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons). Likely appended to THREAT_MODEL.md or DESIGN.md; check PLAN wording.
+`9 B Future-work section`: PLAN.md "Future-work section" box (already lists the byte-counting cap in `limitedFetch`): admin one-time password reset link, disabled-login hint, agent system-prompt line, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons.
 
 ## Gotchas learned
-- ADR 018 says audit records no args, but that is outdated: `src/audit-args.ts` now stores redacted args (<= 2 KB) and `declined` rows exist (ADR 015). The threat model follows the code.
-- Some ADR files (024) contain non-UTF-8 bytes; Read shows U+FFFD and Edit/Write will refuse them. Grep or use shell for those.
-- Bash `cd` into a subfolder persists; use absolute paths or `cd` back.
+- ADR 023 does contain "Images by digest"; 024 only covers side-loading. The earlier "wrong pointer" suspicion was wrong.
+- The cap is checked after the body is buffered, so it does not bound gateway memory (rules/gateway.md has the line).
 
 ## Files the next task needs
-- docs/PLAN.md (Phase 9 B boxes), docs/THREAT_MODEL.md, docs/REQUIREMENTS.md (bonus list only)
+- docs/PLAN.md (Future-work box, line ~150), docs/THREAT_MODEL.md (where the section goes), docs/REQUIREMENTS.md (bonus list only)
