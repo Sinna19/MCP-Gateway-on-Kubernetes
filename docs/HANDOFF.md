@@ -1,13 +1,12 @@
 # Handoff
-- **Done this session (Phase 8, session 3a: Postgres backup):**
-  - `f9d0e19 feat(gateway)`: CronJob `gateway-postgres-backup` (nightly 02:17 UTC, `pg_dump -Fc`, same digest-pinned image, non-root, keep 7 days), dedicated 1Gi PVC, NetworkPolicy (DNS + Postgres only), Postgres ingress allows the backup label. `make backup-pull` (dump to gitignored `backups/`) and `make restore-check` (throwaway pod restores newest PVC dump into `restore_check`, compares row counts).
-  - Proof on k3d and VPS: job from the CronJob completed, `RESTORE CHECK: PASS` (all tables equal), `ENV=prod make backup-pull` wrote a dump.
-  - `8f1d2c3 docs`: ADR 025; PLAN ticked for Postgres backup, k3s secrets-encryption (Ash's 2026-10-20 evidence), secrets-by-script.
+- **Done this session (Phase 8, session 3b: upgrade/rollback rehearsal + README):**
+  - VPS rehearsal: platform rev 3 -> `ENV=prod make deploy HELM_EXTRA="--set gateway.limits.mcp.callsPerMinute=61"` (rev 4, healthz 200) -> `helm rollback platform 3 --wait` (rev 5 "Rollback to 3"). Certs still letsencrypt-prod Ready, `ENV=prod make dod` 9/9.
+  - `87bcbad docs`: README sections (Deploy to a VPS, What differs from local, Upgrade and rollback, Single-node limits), rehearsal proof appended to ADR 024, last two Phase 8 PLAN boxes ticked. Phase 8 is complete.
 - **In progress:** nothing.
-- **Next step:** `8 session 3b: upgrade + rollback rehearsal (helm upgrade, helm history, helm rollback) on the VPS, then README single-node note`. These are the last two unchecked Phase 8 boxes (PLAN.md lines 133-134).
+- **Next step:** `9 README completion: local setup, place an order, connect an MCP client, use chat` (first Phase 9 box, PLAN.md line 141; VPS part is already written).
 - **Gotchas learned:**
-  - A new pod's IP is refused by the NetworkPolicy for a few seconds: the backup script loops on `pg_isready` first (ADR 025).
-  - `sed` with `\n` in a replacement broke YAML indentation; use Edit for multi-line template changes.
-  - `.gitignore` has mixed CRLF/LF; git warns but is fine.
-  - Earlier gotchas still apply (ADR 024 has one non-UTF-8 byte, so append with a shell heredoc; only Ash can `ENV=prod make push-images`; SSH tunnel needs `-o ServerAliveInterval=30`).
-- **Files the next task needs:** `docs/PLAN.md` (Phase 8, line 128), `Makefile` (deploy target), `docs/decisions/024-vps-deploy.md` (append only), `README.md`.
+  - The gateway chart has no `podAnnotations`; the harmless upgrade value is `gateway.limits.mcp.callsPerMinute` (keep it above 19 for dod-check).
+  - Prod helm history is now 5 revisions (1 install, 2 prod-issuer flip, 3 backup, 4 rehearsal, 5 rollback to 3). Next rollback rehearsal rule still applies: one revision back, never to 2 or earlier.
+  - Git Bash needs `export KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml)` for direct helm/kubectl against the VPS; make does it for you.
+  - Earlier gotchas still apply (ADR 024 has one non-UTF-8 byte, so append with a heredoc; only Ash can `ENV=prod make push-images`; tunnel needs `-o ServerAliveInterval=30`).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 9, line 140), `README.md`, `docs/REQUIREMENTS.md` (README wording), `Makefile` (targets), `scripts/register-upstreams.sh` if the order/MCP client steps need exact commands.
