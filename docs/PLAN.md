@@ -149,9 +149,9 @@ In this order:
   - include: mu-plugin trusts missing X-Forwarded-For; safe only while store NetworkPolicy limits direct callers to woo-mcp + setup Job (ADR 024)
 - [x] Tool-result size cap on `/mcp` (`MAX_TOOL_RESULT_BYTES`, default 1 MB, ADR-free: one config value) + threat model follow-ups (cap row, Q2/Q3 wording, ADR 018 note, two new risk rows)
 - [x] Future-work section (now the last section of docs/DESIGN.md): byte-counting cap in `limitedFetch`, admin one-time password reset link, disabled-login hint on the Members page, agent system-prompt line against guessed facts, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons: multi-store, OAuth, hosted servers, many tools
-- [ ] README local section: prerequisites (Windows + Git Bash + Docker Desktop, macOS/Linux notes), cluster-up, secrets, deploy, place an order, connect an MCP client, use the chat, known gotchas (fresh cluster = new admin password, Chrome autofill lockout and how to clear it)
+- [x] README local section: prerequisites (Windows + Git Bash + Docker Desktop, macOS/Linux notes), cluster-up, secrets, deploy, place an order, connect an MCP client, use the chat, known gotchas (fresh cluster = new admin password, Chrome autofill lockout and how to clear it)
 - [x] `docs/DESIGN.md` if missing: architecture, aggregation, routing, failure handling, local vs prod differences; link the ADRs instead of repeating them
-- [ ] Stand-out items list with file pointers (#1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI)
+- [x] Stand-out items list with file pointers (#1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI)
 
 ### C. CI (cut first if time is tight)
 - [ ] `.github/workflows/ci.yml`: on push and PR run `make lint` and `make test`; no cluster, no secrets; pinned action versions; npm cache; pinned helm binary if lint needs one

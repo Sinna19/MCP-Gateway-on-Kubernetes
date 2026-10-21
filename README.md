@@ -2,15 +2,72 @@
 
 WooCommerce store + woo-mcp + team MCP gateway with dashboard and chat agent, all deployed with Helm.
 
-Status: all phases built; docs and demo in Phase 9.
+Status: all phases built; docs and demo in Phase 9. Design: `docs/DESIGN.md`. Threat model: `docs/THREAT_MODEL.md`.
 
-## Quick start (local)
+## Run locally (k3d)
 
-Needs Docker Desktop, k3d, helm, kubectl, make (Git Bash on Windows).
+Needs Docker Desktop, k3d, helm, kubectl and make.
 
-    make cluster-up
-    make deploy
-    make register   # gives the gateway woo-mcp's token; until then woo shows Unreachable
+- **Windows:** use Git Bash for every command below (the scripts are bash). Docker Desktop must be running.
+- **macOS/Linux:** the same commands work in a normal shell. Not tested there; the dev machine is Windows.
+- `*.localtest.me` resolves to 127.0.0.1, so no hosts-file edits. Ports 80 on the host must be free.
+
+1. Create the cluster (k3d cluster `urumi`, Traefik on port 80):
+
+        make cluster-up
+
+2. Deploy. `make deploy` runs `scripts/secrets.sh` first, which creates the Secrets (random passwords, tokens, keys) and never overwrites existing ones. It then builds and imports the images, installs the Helm release and waits for the store setup Job:
+
+        make deploy
+        make register    # gives the gateway woo-mcp's token and adds the fx and notes upstreams
+
+   Optional, for the chat: create the LLM Secret before `make deploy`, or chat answers 503. Put the key in `LLM_API_KEY` without echoing it, (base URL and model are under `gateway.llm` in `deploy/values-local.yaml`):
+
+        read -rs LLM_API_KEY; export LLM_API_KEY; scripts/secrets.sh; unset LLM_API_KEY
+
+3. Get the admin password. A fresh cluster generates a new one. The email is `admin@urumi.local`:
+
+        kubectl -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d; echo
+
+   Log in at http://app.localtest.me.
+
+4. Place an order: open http://shop.localtest.me, add a product to the cart and check out with cash on delivery. The order shows under `woo__list_orders` (dashboard chat or any MCP client).
+
+5. Connect an MCP client. In the dashboard open the Keys page (`/keys`) and create a key (shown once, starts with `umk_`). The gateway URL is `http://app.localtest.me/mcp` (Streamable HTTP) and the key goes in an `Authorization: Bearer` header. Claude Code:
+
+        claude mcp add --transport http urumi http://app.localtest.me/mcp --header "Authorization: Bearer umk_..."
+
+   Claude Desktop (`claude_desktop_config.json`; untested here, it goes through the `mcp-remote` bridge):
+
+        {
+          "mcpServers": {
+            "urumi": {
+              "command": "npx",
+              "args": ["mcp-remote", "http://app.localtest.me/mcp", "--allow-http", "--header", "Authorization: Bearer umk_..."]
+            }
+          }
+        }
+
+   The client sees the tools your role allows, named `woo__...`, `fx__...`, `notes__...`. MCP Inspector works the same way (transport Streamable HTTP, URL, Bearer key).
+
+6. Use the chat: dashboard, Chat page. It acts as the logged-in user through the same routing, role and audit path as `/mcp`, so a member cannot do more in chat than with a key. Write tools ask for confirmation first.
+
+7. Check everything end to end (two users, tools, outage, revoke, audit):
+
+        make dod
+
+   Other checks: `make lint`, `make test`. `make cluster-down` deletes the cluster.
+
+### Local gotchas
+
+- **A fresh cluster means a new admin password** (and a new WordPress admin password). Read it again with the command in step 3.
+- **Chrome autofill can lock you out.** Chrome may fill the password saved for `app.localtest.me` from a previous cluster. Five bad logins for one email lock that email for 15 minutes (ADR 020). The counters are in gateway memory, so restart the gateway to clear the lock, then log in with the new password:
+
+        kubectl -n urumi rollout restart deploy/gateway
+
+  Delete the stale saved passwords for `app.localtest.me` and `shop.localtest.me`, or use a clean browser profile.
+- **`shop.localtest.me` resolves to 127.0.0.1 inside pods too**, which is the pod itself, not the store. Pods must reach the store by service name; the public hostname only works from your machine.
+- Image tags are git tree hashes: commit changes under `services/` or `apps/` before `make deploy`, or the running pod keeps the old image.
 
 ## Deploy to a VPS
 
@@ -74,3 +131,22 @@ The VPS is deliberately one node:
 - PVCs use `local-path`, which is ReadWriteOnce and tied to the node. WordPress and the setup Job share the `wp-content` PVC, which works only because they run on the same node.
 - The gateway uses the `Recreate` strategy with one replica, because `/mcp` sessions live in its memory (ADR 006).
 - Going multi-node would need: a registry instead of side-loaded images, RWX storage or `podAffinity` for the shared PVC, and sticky sessions or Redis for `/mcp` sessions and rate limits.
+
+## Stand-out items
+
+Numbered as the optional list in `docs/REQUIREMENTS.md`. What was skipped, and why, is in `docs/DESIGN.md`.
+
+1. **VPS deploy with Let's Encrypt TLS:** one k3s node at `https://app.20.197.63.44.sslip.io`, cert-manager, `deploy/values-prod.yaml`, ADR 024 (sections above).
+2. **Tool permissions per role:** admins choose which tools members may see and call, in `tools/list` and on every call; ADR 022, `services/gateway/src/`.
+6. **Security hardening:**
+   - SSRF: `services/gateway/src/url-guard.ts` rejects private and metadata addresses, and egress NetworkPolicies repeat the same ranges (ADR 019, 009).
+   - Default-deny ingress, per-workload egress policies, non-root containers (`charts/*/templates/`).
+   - Upstream credentials encrypted with AES-256-GCM, key rotation with `make rotate-key` (ADR 023); k3s Secrets encryption on the VPS.
+7. **Rate limits** (the scaling half is not done, ADR 006): login, per-key `/mcp` calls and sessions, daily chat cap (ADR 020).
+9. **Upgrade and rollback:** `helm rollback` rehearsed on the VPS, image tag = git tree hash (section above, ADR 024).
+
+Also built:
+
+- **Postgres backups and restore check:** CronJob dump to a PVC, `make backup-pull` copies it off the box, `make restore-check` takes a fresh backup and proves it restores (ADR 025).
+- **Tool-result size cap on `/mcp`:** `MAX_TOOL_RESULT_BYTES`, default 1 MB (`services/gateway/src/config.ts`, `docs/THREAT_MODEL.md`).
+- **CI:** TODO, no workflow yet (`.github/workflows/ci.yml` is planned).

@@ -104,7 +104,14 @@ Names from `docs/REQUIREMENTS.md`.
 - **OAuth for MCP clients:** API keys cover every client we use; OAuth is a separate authorization server's worth of work.
 - **Hosted MCP servers (the gateway running upstreams for users):** upstreams are registered by URL and run in the cluster; running arbitrary user code is a security surface we chose not to open.
 - **Many-tools search:** three upstreams expose a small tool set, so the flat list is fine; a search tool matters only at hundreds of tools (listing is already capped at 500 per upstream).
-- **Observability and horizontal scaling:** only the audit log, one log line per chat request and the health endpoints exist; scaling is blocked by the in-memory state above.
-- **Upgrades/rollback:** no dedicated work beyond Helm and `make rotate-key` (ADR 023).
+- **Horizontal scaling:** skipped; sessions, rate-limit buckets and upstream connections are in memory, so the gateway stays one replica (ADR 006).
 
-Attempted instead: VPS deploy (ADR 024), tool permissions (ADR 022), security hardening (ADR 019, 023), rate limits (ADR 020), Postgres backups (ADR 025).
+### Partial
+
+- **Observability:** exists: `/healthz` and `/readyz`, the audit log, one plain-text log line per chat request (not structured JSON). Missing: metrics, and alerting of any kind, including certificate expiry.
+
+### Done, not skipped
+
+- **Upgrades/rollback:** `helm rollback` rev4 to rev5 was rehearsed on the VPS; image tags are git tree hashes (README "Upgrade and rollback", ADR 024).
+
+What was attempted instead of the skipped bonuses is in the README "Stand-out items" list.
