@@ -1,4 +1,4 @@
-# The database holds users, key hashes and encrypted upstream credentials, so only gateway pods (and the rotation Job) may connect.
+# The database holds users, key hashes and encrypted upstream credentials, so only gateway pods (and the rotation and backup Jobs) may connect.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -20,6 +20,10 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: gateway-rotate-key
+        # The nightly pg_dump CronJob (ADR 025).
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway-postgres-backup
       ports:
         - port: 5432
           protocol: TCP

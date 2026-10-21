@@ -24,7 +24,7 @@ TS_SERVICES := woo-mcp gateway fx-mcp notes-mcp
 TS_PROJECTS := $(addprefix services/,$(TS_SERVICES)) apps/dashboard
 
 .NOTPARALLEL:
-.PHONY: cluster-up cluster-down images push-images ping cert-manager deps secrets deploy register lint test dod rotate-key
+.PHONY: cluster-up cluster-down images push-images ping cert-manager deps secrets deploy register lint test dod rotate-key backup-pull restore-check
 
 # Proves the selected cluster answers (for prod: the SSH tunnel is up and the kubeconfig works).
 ping:
@@ -143,3 +143,10 @@ dod:
 # Re-encrypts the stored upstream credentials under a new CREDENTIALS_KEY (ADR 023). The gateway is down ~30s.
 rotate-key:
 	scripts/rotate-credentials-key.sh
+
+# Off-box pg_dump of the gateway database into backups/ (ADR 025). restore-check restores the newest PVC dump into a throwaway database.
+backup-pull:
+	scripts/backup-pull.sh
+
+restore-check:
+	scripts/restore-check.sh

@@ -71,3 +71,11 @@ postgres:
     limits:
       cpu: 500m
       memory: 384Mi
+
+# Nightly pg_dump to a dedicated PVC (ADR 025). Off-box copy: make backup-pull.
+backup:
+  enabled: true
+  schedule: "17 2 * * *" # UTC
+  retentionDays: 7
+  storage:
+    size: 1Gi

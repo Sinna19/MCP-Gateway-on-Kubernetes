@@ -1,0 +1,133 @@
+{{- if .Values.backup.enabled }}
+# Nightly pg_dump of the gateway database (ADR 025). Custom format (-Fc) so pg_restore can restore into any database.
+# Same digest-pinned image as Postgres, non-root. The dump is written to a temp name and renamed, so a failed run never leaves a half file that looks valid.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gateway-postgres-backup
+  labels:
+    app.kubernetes.io/name: gateway-postgres-backup
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: gateway-postgres-backup
+            {{- include "gateway.labels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            fsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: {{ .Values.postgres.image }}
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                runAsUser: 70
+                runAsGroup: 70
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: PGHOST
+                  value: gateway-postgres
+                - name: PGUSER
+                  value: {{ .Values.postgres.user | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.postgres.database | quote }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.dbSecret }}
+                      key: password
+                - name: RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  # A new pod's IP is refused by the NetworkPolicy for a few seconds, so wait for Postgres.
+                  for i in $(seq 30); do pg_isready -q && break; sleep 2; done
+                  f=/backups/gateway-$(date -u +%Y%m%dT%H%M%SZ).dump
+                  trap 'rm -f "$f.tmp"' EXIT
+                  pg_dump -Fc -f "$f.tmp"
+                  mv "$f.tmp" "$f"
+                  find /backups -name 'gateway-*' -mtime +"$RETENTION_DAYS" -delete
+                  ls -l /backups
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: gateway-postgres-backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gateway-postgres-backups
+  labels:
+    app.kubernetes.io/name: gateway-postgres-backup
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage.size }}
+---
+# The backup pod may reach DNS and Postgres, nothing else, and nobody may reach it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-postgres-backup
+  labels:
+    app.kubernetes.io/name: gateway-postgres-backup
+    {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-postgres-backup
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway-postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+{{- end }}
