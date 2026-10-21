@@ -1,20 +1,21 @@
 # Handoff
-## Done this session (Phase 9, B: README)
-- `4c6ef9f` docs: README "Run locally (k3d)" section (prereqs, cluster-up, deploy, register, admin password, order, MCP client config, chat, `make dod`, gotchas) and "Stand-out items" list (#1, #2, #6, #7, #9 plus backups and result size cap; CI is a TODO line).
-- Same commit: DESIGN.md now lists upgrades/rollback as done, observability as partial (healthz/readyz, audit, plain-text logs; no metrics or alerting), horizontal scaling skipped (ADR 006). "Attempted instead" replaced by a pointer to the README list.
-- PLAN boxes for README local section and stand-out list ticked. `make lint` ok.
+## Done this session (Phase 9, C: CI)
+- `7cebe21` ci: `.github/workflows/ci.yml` (push to main + PR, `contents: read`, concurrency per ref with cancel, ubuntu-latest, Node 24, npm cache over the 5 lockfiles, helm v4.3.0 via setup-helm, `npm ci` in each TS project, then `make lint`, `make test`, `bash .claude/hooks/test-guard-kube-context.sh`).
+- Actions pinned to full SHAs fetched with `git ls-remote`: checkout v7.0.1, setup-node v7.1.0, setup-helm v5.0.1 (tag in a comment).
+- README "CI" stand-out line now points to the workflow; PLAN box ticked. `make lint` ok locally.
 
 ## In progress
-- Nothing half-finished.
+- **The first CI run is unchecked.** `gh` is not installed, so I could not watch it. Look at the Actions tab of the GitHub repo for commit `7cebe21`. If it fails, fix the root cause in `.github/workflows/ci.yml` (never skip tests) and push again.
 
 ## Next step
-`9 C CI workflow` (then remove the TODO CI line in README "Stand-out items" and add the workflow pointer).
+`9 D Demo` (demo script against the live VPS, pre-flight checklist, record). Check the CI result first.
 
 ## Gotchas learned
-- Commands in the README were checked against the Makefile/scripts/REHEARSAL.md, but NOT run this session. The Claude Desktop `mcp-remote` snippet is untested (marked so).
-- The Chrome-lockout fix (`rollout restart deploy/gateway`) relies on login buckets being in memory (ADR 020); confirm during the demo pre-flight.
-- Gateway logs are plain `console.log`, not structured JSON; the README/DESIGN say so.
-- README stand-out numbers follow the optional list order in REQUIREMENTS.md (1 VPS, 2 permissions, 6 hardening, 7 scaling+rate limits, 9 upgrades).
+- No Makefile change was needed: `make lint` and `make test` need no cluster. `deps` uses `file://` chart dependencies, and the `--kube-context` flag is not contacted by `helm dependency update`.
+- Gateway tests start their own Postgres with `docker run postgres:17.6-alpine` (`services/gateway/test/global-setup.ts`), so CI has no Postgres service container. It relies on Docker being on the runner.
+- Makefile image tags use `git rev-parse HEAD:<dir>`, so CI needs a git checkout (the default one is enough).
+- No `.nvmrc` and no root package.json; Node comes from `engines` (>=24) and is set in the workflow.
+- Untested before push: the hook test script in CI (it was written for Git Bash; ubuntu bash should be fine).
 
 ## Files the next task needs
-- docs/PLAN.md (Phase 9 section C), Makefile (lint/test targets), README.md (stand-out CI line)
+- docs/PLAN.md (Phase 9 section D), docs/REQUIREMENTS.md (six video sections), docs/REHEARSAL.md if present, README.md
