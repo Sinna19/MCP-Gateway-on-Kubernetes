@@ -1,16 +1,13 @@
 # Handoff
-- **Done this session (Phase 8, session 2b: production TLS and VPS proof):**
-  - `8083068 feat(charts)`: `deploy/values-prod.yaml` uses `letsencrypt-prod`. `ENV=prod make deploy`: `gateway-tls` and `store-wordpress-tls` Ready with the prod issuer first try; `openssl` shows Let's Encrypt CN=YR1 for `app.` and `shop.`.
-  - `ENV=prod make register` + `ENV=prod make dod`: 9/9, including `cookie Secure: PASS`.
-  - NetworkPolicy deny probes on the VPS: unlabelled pod blocked to woo-mcp, WordPress, MariaDB, Postgres, fx-mcp; labelled controls reach their targets.
-  - Ash's manual checks all PASS: admin login, chat (llm-api set), COD order 14, MCP Inspector 2.11.0 with 10 tools.
-  - `31dbfb0 docs`: ADR 024 and PLAN record all of it.
-- **In progress:** nothing. Check `kubectl -n urumi get pods -o name | grep np-` on the VPS: the np-probe/np-gw/np-setup pods were still terminating at last look.
-- **Next step:** `8 session 3: upgrade + rollback rehearsal (helm upgrade, helm history, helm rollback) on the VPS, then README single-node note`. Remaining Phase 8 boxes after that: k3s `--secrets-encryption`, Postgres backup CronJob, secrets-by-script checkbox (secrets.sh already does this, tick it with evidence).
+- **Done this session (Phase 8, session 3a: Postgres backup):**
+  - `f9d0e19 feat(gateway)`: CronJob `gateway-postgres-backup` (nightly 02:17 UTC, `pg_dump -Fc`, same digest-pinned image, non-root, keep 7 days), dedicated 1Gi PVC, NetworkPolicy (DNS + Postgres only), Postgres ingress allows the backup label. `make backup-pull` (dump to gitignored `backups/`) and `make restore-check` (throwaway pod restores newest PVC dump into `restore_check`, compares row counts).
+  - Proof on k3d and VPS: job from the CronJob completed, `RESTORE CHECK: PASS` (all tables equal), `ENV=prod make backup-pull` wrote a dump.
+  - `8f1d2c3 docs`: ADR 025; PLAN ticked for Postgres backup, k3s secrets-encryption (Ash's 2026-10-20 evidence), secrets-by-script.
+- **In progress:** nothing.
+- **Next step:** `8 session 3b: upgrade + rollback rehearsal (helm upgrade, helm history, helm rollback) on the VPS, then README single-node note`. These are the last two unchecked Phase 8 boxes (PLAN.md lines 133-134).
 - **Gotchas learned:**
-  - SSH tunnel: start with `-o ServerAliveInterval=30` (dropped once after ~1h idle). Added to `.claude/rules/kubernetes.md`.
-  - `wget` in probes fails on any HTTP error, so woo-mcp looked "blocked" for the allowed pod; use `nc -z` (added to the rules).
-  - `docs/decisions/024-vps-deploy.md` contains one non-UTF-8 byte (in "http://app.…"), so Edit/Write refuse it; append with a shell heredoc, or fix the byte first.
-  - Admin password: `kubectl --context urumi-vps -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d | clip` (login `admin@urumi.local`).
-  - Earlier gotchas still apply: only Ash can `ENV=prod make push-images` (ssh-agent); the kube-context hook scans command text; plain Git Bash needs `export KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml)`.
-- **Files the next task needs:** `docs/PLAN.md` (Phase 8, line 128), `docs/decisions/024-vps-deploy.md`, `Makefile` (deploy target), `.claude/rules/kubernetes.md`.
+  - A new pod's IP is refused by the NetworkPolicy for a few seconds: the backup script loops on `pg_isready` first (ADR 025).
+  - `sed` with `\n` in a replacement broke YAML indentation; use Edit for multi-line template changes.
+  - `.gitignore` has mixed CRLF/LF; git warns but is fine.
+  - Earlier gotchas still apply (ADR 024 has one non-UTF-8 byte, so append with a shell heredoc; only Ash can `ENV=prod make push-images`; SSH tunnel needs `-o ServerAliveInterval=30`).
+- **Files the next task needs:** `docs/PLAN.md` (Phase 8, line 128), `Makefile` (deploy target), `docs/decisions/024-vps-deploy.md` (append only), `README.md`.
