@@ -1,15 +1,16 @@
 # Handoff
-- **Done this session (Phase 8, session 2a: first VPS deploy, staging issuer):**
-  - `bb2a1b8 feat(scripts)`: `make ping`, `make cert-manager` (chart pinned v1.21.2), `make push-images` + `scripts/push-images.sh`, `ENV=prod make deploy` skips the image build; ADR 024 updated (pin, side-load note, VPS proof).
-  - On the VPS: cert-manager 3 pods Running; Traefik/CoreDNS labels match `global.network`; 5 images side-loaded by Ash; `ENV=prod make secrets` + `make deploy` ok, all pods Ready (no ImagePull errors), setup Job complete.
-  - Proof: `gateway-tls` and `store-wordpress-tls` Ready first try (issuer `letsencrypt-staging`, hairpin self-check fine); `curl -skI https://shop.20.197.63.44.sslip.io` 200; `http://app.…` 308 to https; node requests cpu 32%, mem 31%.
-- **In progress:** nothing. Not done: `llm-api` Secret (chat disabled until created), `make register`, `make dod` on https, the `cookie Secure: PASS` line, prod issuer.
-- **Next step:** `8 session 2b: set llm-api, flip clusterIssuer to letsencrypt-prod in deploy/values-prod.yaml, ENV=prod make deploy, check issuer, ENV=prod make register, ENV=prod make dod, openssl issuer check` (plan Session 2, steps 5-6; never delete the TLS Secrets, stop on `rateLimited`).
+- **Done this session (Phase 8, session 2b: production TLS and VPS proof):**
+  - `8083068 feat(charts)`: `deploy/values-prod.yaml` uses `letsencrypt-prod`. `ENV=prod make deploy`: `gateway-tls` and `store-wordpress-tls` Ready with the prod issuer first try; `openssl` shows Let's Encrypt CN=YR1 for `app.` and `shop.`.
+  - `ENV=prod make register` + `ENV=prod make dod`: 9/9, including `cookie Secure: PASS`.
+  - NetworkPolicy deny probes on the VPS: unlabelled pod blocked to woo-mcp, WordPress, MariaDB, Postgres, fx-mcp; labelled controls reach their targets.
+  - Ash's manual checks all PASS: admin login, chat (llm-api set), COD order 14, MCP Inspector 2.11.0 with 10 tools.
+  - `31dbfb0 docs`: ADR 024 and PLAN record all of it.
+- **In progress:** nothing. Check `kubectl -n urumi get pods -o name | grep np-` on the VPS: the np-probe/np-gw/np-setup pods were still terminating at last look.
+- **Next step:** `8 session 3: upgrade + rollback rehearsal (helm upgrade, helm history, helm rollback) on the VPS, then README single-node note`. Remaining Phase 8 boxes after that: k3s `--secrets-encryption`, Postgres backup CronJob, secrets-by-script checkbox (secrets.sh already does this, tick it with evidence).
 - **Gotchas learned:**
-  - The ssh key is passphrase-protected: only Ash can run `ENV=prod make push-images` (shell with ssh-agent loaded; run `make images` first). The tool shell gets `Permission denied (publickey)`.
-  - llm-api (Ash runs, hidden input): `read -rs k; KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml) kubectl --context urumi-vps -n urumi create secret generic llm-api --from-literal=api-key="$k"; unset k`, then restart the gateway.
-  - woo-mcp pod shows FailedMount "non-existent secret key: password" until the setup Job fills `woo-api`; it self-heals within a few minutes.
-  - Python `'\\\n'` in Makefile edits produced a literal backslash-n; check with `cat -A`.
-  - Plain Git Bash needs `export KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml)` for direct kubectl against the VPS.
-  - The kube-context hook scans command text: a backtick right after a context name in a heredoc is denied; write docs with the Write tool.
-- **Files the next task needs:** plan file `C:\Users\aashi\.claude\plans\pasted-content-id-bcf0-phase-8-starry-aurora.md` (Session 2), `deploy/values-prod.yaml`, `scripts/dod-check.sh`, `docs/decisions/024-vps-deploy.md`.
+  - SSH tunnel: start with `-o ServerAliveInterval=30` (dropped once after ~1h idle). Added to `.claude/rules/kubernetes.md`.
+  - `wget` in probes fails on any HTTP error, so woo-mcp looked "blocked" for the allowed pod; use `nc -z` (added to the rules).
+  - `docs/decisions/024-vps-deploy.md` contains one non-UTF-8 byte (in "http://app.…"), so Edit/Write refuse it; append with a shell heredoc, or fix the byte first.
+  - Admin password: `kubectl --context urumi-vps -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d | clip` (login `admin@urumi.local`).
+  - Earlier gotchas still apply: only Ash can `ENV=prod make push-images` (ssh-agent); the kube-context hook scans command text; plain Git Bash needs `export KUBECONFIG=$(cygpath -m ~/.kube/urumi-vps.yaml)`.
+- **Files the next task needs:** `docs/PLAN.md` (Phase 8, line 128), `docs/decisions/024-vps-deploy.md`, `Makefile` (deploy target), `.claude/rules/kubernetes.md`.
