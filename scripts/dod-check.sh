@@ -146,6 +146,16 @@ A_EMAIL="$(secret gateway-app admin-email | tr -d '\r')"
 A_PASSWORD="$(secret gateway-app admin-password)"
 code="$(login "$A_JAR" "$A_EMAIL" "$A_PASSWORD")"
 [ "$code" = 200 ] || { echo "admin login failed (HTTP $code); is the cluster up and 'make register' done?" >&2; exit 1; }
+# Session cookie flags. curl's jar marks HttpOnly with a #HttpOnly_ prefix and Secure in column 4.
+case "$BASE" in
+  https://*)
+    if awk -F'	' '/^#HttpOnly_/ && $4 == "TRUE" { found = 1 } END { exit !found }' "$A_JAR"; then
+      pass "cookie Secure" "session cookie is Secure and HttpOnly"
+    else
+      fail "cookie Secure" "session cookie lacks Secure or HttpOnly over https"
+    fi ;;
+  *) echo "cookie Secure: skipped (http)" ;;
+esac
 api "$A_JAR" GET /api/me
 A_ID="$(printf '%s' "$ABODY" | jq -r .id | tr -d '\r')"
 

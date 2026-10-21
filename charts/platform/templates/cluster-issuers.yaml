@@ -1,0 +1,43 @@
+{{- if .Values.certManager.clusterIssuers }}
+# Let's Encrypt, HTTP-01 through Traefik. Staging first (untrusted certs, generous limits), then prod.
+# No email: expiry notices are not needed because cert-manager renews on its own.
+{{- range $name, $server := dict "letsencrypt-staging" "https://acme-staging-v02.api.letsencrypt.org/directory" "letsencrypt-prod" "https://acme-v02.api.letsencrypt.org/directory" }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $name }}
+spec:
+  acme:
+    server: {{ $server }}
+    privateKeySecretRef:
+      name: {{ $name }}-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ $.Values.global.ingress.className }}
+{{- end }}
+---
+# The namespace denies all ingress by default, and cert-manager's solver pod runs in it. Without this the
+# challenge request from Traefik is refused and issuance hangs. 8089 is the solver's container port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-acme-http01-solver
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.network.ingressController.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.global.network.ingressController.podLabels | nindent 14 }}
+      ports:
+        - port: 8089
+          protocol: TCP
+{{- end }}

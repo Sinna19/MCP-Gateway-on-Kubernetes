@@ -85,7 +85,13 @@ spec:
               mountPath: /var/www/html/wp-content
             - name: setup
               mountPath: /setup
+            - name: mu-plugin
+              mountPath: /var/www/html/wp-content/mu-plugins/app-passwords.php
+              subPath: app-passwords.php
       volumes:
+        - name: mu-plugin
+          configMap:
+            name: store-mu-plugin
         - name: core
           emptyDir: {}
         - name: content

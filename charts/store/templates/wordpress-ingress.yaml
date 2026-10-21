@@ -6,6 +6,15 @@ metadata:
   labels:
     app.kubernetes.io/name: wordpress
     {{- include "store.labels" . | nindent 4 }}
+  {{- if or .Values.global.ingress.redirectHttps .Values.global.ingress.clusterIssuer }}
+  annotations:
+    {{- if .Values.global.ingress.redirectHttps }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-redirect-https@kubernetescrd
+    {{- end }}
+    {{- with .Values.global.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ . | quote }}
+    {{- end }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.global.ingress.className }}
   {{- if .Values.global.ingress.tls }}

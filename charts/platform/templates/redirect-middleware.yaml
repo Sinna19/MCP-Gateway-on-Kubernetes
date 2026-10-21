@@ -1,0 +1,12 @@
+{{- if .Values.global.ingress.redirectHttps }}
+# Permanent HTTP to HTTPS redirect. The cert-manager solver Ingress has a longer path than "/", so Traefik
+# routes /.well-known/acme-challenge/ to it first and HTTP-01 still works.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+{{- end }}

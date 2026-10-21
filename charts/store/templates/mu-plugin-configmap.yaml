@@ -1,0 +1,17 @@
+# Application Passwords are off over plain HTTP unless WP_ENVIRONMENT_TYPE is "local". woo-mcp and the
+# setup Job reach WordPress over in-cluster HTTP, so in production they would get 401 (ADR 024).
+# Traefik adds X-Forwarded-For to every public request, so a request without it is an in-cluster caller
+# (NetworkPolicy allows only woo-mcp). Public plain-HTTP requests stay refused.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: store-mu-plugin
+  labels:
+    app.kubernetes.io/name: wordpress
+    {{- include "store.labels" . | nindent 4 }}
+data:
+  app-passwords.php: |
+    <?php
+    add_filter( 'wp_is_application_passwords_available', function ( $available ) {
+        return is_ssl() || empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ? true : $available;
+    } );

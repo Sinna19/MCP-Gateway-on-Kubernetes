@@ -5,6 +5,10 @@ global:
   ingress:
     className: traefik
     tls: false
+    # Name of a ClusterIssuer. Set: store and gateway Ingresses get the cert-manager annotation (ADR 024).
+    clusterIssuer: ""
+    # true: one Traefik Middleware redirects HTTP to HTTPS and every Ingress uses it.
+    redirectHttps: false
   # Who the NetworkPolicies treat as the ingress controller and DNS. Namespaces match on kubernetes.io/metadata.name.
   network:
     # Container port of every upstream MCP server (woo, fx, notes). The three charts and the gateway's egress
@@ -25,3 +29,8 @@ global:
       - 192.168.0.0/16
       - 169.254.0.0/16
       - 100.64.0.0/10
+
+certManager:
+  # true renders the two Let's Encrypt ClusterIssuers and the HTTP-01 solver NetworkPolicy. Off locally:
+  # k3d has no cert-manager, so the ClusterIssuer kind does not exist there.
+  clusterIssuers: false

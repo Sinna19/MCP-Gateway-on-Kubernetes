@@ -1,10 +1,23 @@
-# VPS k3s. Replace the domain with the real one once DNS exists (see ADR 001).
+# VPS k3s (single node). Both domain and TLS come from here; ADR 024.
 global:
-  domain: example.com
+  # The one line to change for a real domain.
+  domain: 20.197.63.44.sslip.io
   storageClass: local-path
   ingress:
     className: traefik
-    tls: false
-# Application Passwords need HTTPS unless WP_ENVIRONMENT_TYPE is "local". Prod stays on "local"
-# (the chart default) while global.ingress.tls is false; set store.wordpress.environmentType to
-# "production" here once TLS is on.
+    # Drives https URLs (WP_HOME), ingress tls blocks and COOKIE_SECURE=true.
+    tls: true
+    # Staging first; change to letsencrypt-prod once staging issues.
+    clusterIssuer: letsencrypt-staging
+    redirectHttps: true
+certManager:
+  # cert-manager is installed on the VPS as its own release, so the CRDs exist there.
+  clusterIssuers: true
+store:
+  wordpress:
+    # Application Passwords need this plus the mu-plugin (in-cluster HTTP); proven on k3d first.
+    environmentType: production
+gateway:
+  llm:
+    baseUrl: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-120b

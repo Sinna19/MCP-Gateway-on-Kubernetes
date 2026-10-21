@@ -126,10 +126,10 @@ In this order:
 - **Accept:** every DoD bullet demonstrated in one clean run on a fresh cluster; `scripts/dod-check.sh` rerun.
 
 ## Phase 8: VPS (k3s)
-- [ ] Review #7: `COOKIE_SECURE` and TLS in `values-prod.yaml`; add a `dod-check` assertion that prod renders Secure cookies
-- [ ] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
+- [x] Review #7: `COOKIE_SECURE` and TLS in `values-prod.yaml`; add a `dod-check` assertion that prod renders Secure cookies (lint assertion + dod Secure check; the PASS line is proven on the VPS, session 2)
+- [x] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
 - [ ] Secrets created on the server via script, never committed
-- [ ] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use
+- [x] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use
 - [ ] VPS is single-node: setup Job and WordPress share an RWO PVC; say so in README (podAffinity if ever multi-node)
 - [ ] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
 - [ ] k3s `--secrets-encryption` so Secrets are encrypted at rest

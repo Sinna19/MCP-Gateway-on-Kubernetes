@@ -1,4 +1,6 @@
 {{- $host := printf "%s.%s" .Values.ingress.host .Values.global.domain }}
+# cert-manager annotates this Ingress only: the dashboard Ingress shares host and Secret gateway-tls, and two
+# annotated Ingresses would make two Certificates fight over one Secret.
 # Only /mcp and /api are exposed. /healthz and /readyz stay cluster-internal.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -7,6 +9,15 @@ metadata:
   labels:
     app.kubernetes.io/name: gateway
     {{- include "gateway.labels" . | nindent 4 }}
+  {{- if or .Values.global.ingress.redirectHttps .Values.global.ingress.clusterIssuer }}
+  annotations:
+    {{- if .Values.global.ingress.redirectHttps }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-redirect-https@kubernetescrd
+    {{- end }}
+    {{- with .Values.global.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ . | quote }}
+    {{- end }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.global.ingress.className }}
   {{- if .Values.global.ingress.tls }}

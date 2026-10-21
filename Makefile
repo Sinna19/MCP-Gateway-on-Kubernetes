@@ -70,11 +70,12 @@ deps:
 secrets:
 	scripts/secrets.sh
 
+# HELM_EXTRA adds helm flags, e.g. make deploy HELM_EXTRA="--set store.wordpress.environmentType=production".
 deploy: deps secrets images
 	$(HELM) upgrade --install platform charts/platform -n $(NS) --create-namespace -f $(VALUES) \
 	  --set woo-mcp.image.tag=$(WOO_MCP_TAG) --set gateway.image.tag=$(GATEWAY_TAG) \
 	  --set upstreams.fx.image.tag=$(FX_MCP_TAG) --set upstreams.notes.image.tag=$(NOTES_MCP_TAG) \
-	  --set dashboard.image.tag=$(DASHBOARD_TAG)
+	  --set dashboard.image.tag=$(DASHBOARD_TAG) $(HELM_EXTRA)
 	$(KUBECTL) -n $(NS) rollout status statefulset/gateway-postgres --timeout=180s
 	$(KUBECTL) -n $(NS) rollout status deploy/gateway --timeout=180s
 	$(KUBECTL) -n $(NS) rollout status deploy/fx-mcp --timeout=180s
@@ -95,7 +96,7 @@ lint: deps
 	for v in local prod; do \
 	  out=$$(helm template platform charts/platform -f deploy/values-$$v.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint --set dashboard.image.tag=lint 2>&1 >/dev/null) || { echo "$$out" | tail -20; fail=1; }; \
 	done; \
-	d=$$(sed -n 's/^  domain: *\([^ ]*\).*/\1/p' deploy/values-prod.yaml); \
+	out=$$(helm template platform charts/platform -f deploy/values-prod.yaml --set woo-mcp.image.tag=lint --set gateway.image.tag=lint --set upstreams.fx.image.tag=lint --set upstreams.notes.image.tag=lint --set dashboard.image.tag=lint 2>/dev/null | grep -A1 'name: COOKIE_SECURE' | grep -c '"true"'); 	[ "$$out" = 1 ] || { echo "values-prod.yaml must render COOKIE_SECURE \"true\""; fail=1; }; 	d=$$(sed -n 's/^  domain: *\([^ ]*\).*/\1/p' deploy/values-prod.yaml); \
 	case "$$d" in '' | *' '*) echo "values-prod.yaml: global.domain empty or has spaces"; fail=1;; esac; \
 	for s in $(TS_PROJECTS); do \
 	  out=$$(npm --prefix $$s run lint 2>&1) || { echo "$$out" | tail -20; fail=1; }; \

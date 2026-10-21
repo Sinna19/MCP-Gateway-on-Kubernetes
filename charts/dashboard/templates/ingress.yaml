@@ -7,6 +7,12 @@ metadata:
   labels:
     app.kubernetes.io/name: dashboard
     {{- include "dashboard.labels" . | nindent 4 }}
+  {{- if or .Values.global.ingress.redirectHttps }}
+  annotations:
+    {{- if .Values.global.ingress.redirectHttps }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-redirect-https@kubernetescrd
+    {{- end }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.global.ingress.className }}
   {{- if .Values.global.ingress.tls }}

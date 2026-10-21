@@ -85,6 +85,9 @@ spec:
               mountPath: /var/www/html
             - name: content
               mountPath: /var/www/html/wp-content
+            - name: mu-plugin
+              mountPath: /var/www/html/wp-content/mu-plugins/app-passwords.php
+              subPath: app-passwords.php
       volumes:
         # WordPress core is copied from the image on every start; only wp-content is persistent.
         - name: core
@@ -92,3 +95,6 @@ spec:
         - name: content
           persistentVolumeClaim:
             claimName: store-wordpress-content
+        - name: mu-plugin
+          configMap:
+            name: store-mu-plugin
