@@ -1,23 +1,20 @@
 # Handoff
-## Done this session (Phase 9, B: DESIGN.md + future work)
-- `65ddbb2` docs: new `docs/DESIGN.md` with six sections: architecture (mermaid + ownership table), aggregation/routing, auth/roles, failure handling, local vs prod (from `deploy/values-prod.yaml`), future work + skipped bonuses. Future work is its last section; both PLAN boxes ticked. `make lint` ok.
-- Claims were checked against code/ADRs by grep. Judgement calls Ash should confirm before the demo: the "skipped bonuses" reasons, and that observability and upgrades/rollback are listed as not attempted.
+## Done this session (Phase 9, B: README)
+- `4c6ef9f` docs: README "Run locally (k3d)" section (prereqs, cluster-up, deploy, register, admin password, order, MCP client config, chat, `make dod`, gotchas) and "Stand-out items" list (#1, #2, #6, #7, #9 plus backups and result size cap; CI is a TODO line).
+- Same commit: DESIGN.md now lists upgrades/rollback as done, observability as partial (healthz/readyz, audit, plain-text logs; no metrics or alerting), horizontal scaling skipped (ADR 006). "Attempted instead" replaced by a pointer to the README list.
+- PLAN boxes for README local section and stand-out list ticked. `make lint` ok.
 
 ## In progress
 - Nothing half-finished.
 
 ## Next step
-Rest of Phase 9 (see PLAN.md Phase 9 unchecked boxes): README (README has no stand-out list yet; DESIGN's last line says "Attempted instead", so the README list should match it), demo video.
+`9 C CI workflow` (then remove the TODO CI line in README "Stand-out items" and add the workflow pointer).
 
 ## Gotchas learned
-- README currently has no stand-out section; PLAN lists it as a Phase 9 item.
-- No admin password-reset exists and a disabled login returns the generic 401 (`api/auth.ts`); both are in Future work.
+- Commands in the README were checked against the Makefile/scripts/REHEARSAL.md, but NOT run this session. The Claude Desktop `mcp-remote` snippet is untested (marked so).
+- The Chrome-lockout fix (`rollout restart deploy/gateway`) relies on login buckets being in memory (ADR 020); confirm during the demo pre-flight.
+- Gateway logs are plain `console.log`, not structured JSON; the README/DESIGN say so.
+- README stand-out numbers follow the optional list order in REQUIREMENTS.md (1 VPS, 2 permissions, 6 hardening, 7 scaling+rate limits, 9 upgrades).
 
 ## Files the next task needs
-- docs/PLAN.md (Phase 9 section), docs/REQUIREMENTS.md, README.md
-
-## Recent commits
-65ddbb2 docs: design and future work
-22d0e81 chore: handoff
-7152f86 docs: threat model follow-ups
-2facf8a fix(gateway): cap tool-result size on /mcp
+- docs/PLAN.md (Phase 9 section C), Makefile (lint/test targets), README.md (stand-out CI line)
