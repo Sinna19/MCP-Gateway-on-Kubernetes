@@ -7,8 +7,8 @@ global:
     className: traefik
     # Drives https URLs (WP_HOME), ingress tls blocks and COOKIE_SECURE=true.
     tls: true
-    # Staging first; change to letsencrypt-prod once staging issues.
-    clusterIssuer: letsencrypt-staging
+    # Staging issued fine (session 2a); now the real issuer.
+    clusterIssuer: letsencrypt-prod
     redirectHttps: true
 certManager:
   # cert-manager is installed on the VPS as its own release, so the CRDs exist there.
