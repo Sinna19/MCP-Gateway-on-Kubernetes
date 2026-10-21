@@ -134,6 +134,7 @@ In this order:
 - [ ] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
 - [ ] k3s `--secrets-encryption` so Secrets are encrypted at rest
 - [ ] Postgres backups for the gateway database (pg_dump CronJob or similar)
+- [x] Session 2b done 2026-10-21: prod Let's Encrypt certs, `make dod` 9/9 on https with cookie Secure PASS, deny probes, login/chat/COD order/MCP Inspector verified (ADR 024)
 - **Accept:** DoD flow works at the public hostname; README lists exactly what differs from local.
 
 ## Phase 9: Docs + demo

@@ -21,3 +21,10 @@ The mu-plugin is also active locally (harmless). The domain is one line in `depl
 
 ## Proof on the VPS (staging issuer)
 Both Certificates (`gateway-tls`, `store-wordpress-tls`) became Ready on the first try with issuer `letsencrypt-staging`: the hairpin self-check works, no solver debugging needed. `curl -skI https://shop.20.197.63.44.sslip.io` gives 200; `http://app.…` gives 308 to https. Node requests: cpu 32%, memory 31%.
+
+## Proof on the VPS (production issuer, 2026-10-21)
+- `clusterIssuer` flipped to `letsencrypt-prod`; `ENV=prod make deploy`. Both Certificates Ready with issuer `letsencrypt-prod` on the first try (no rate limit, no Certificate deleted). `openssl s_client` shows `O=Let's Encrypt, CN=YR1` for `app.` and `shop.`.
+- `ENV=prod make register` then `ENV=prod make dod`: 9 passed, 0 failed, including `PASS cookie Secure: session cookie is Secure and HttpOnly`.
+- NetworkPolicy deny probes: an unlabelled pod is blocked to woo-mcp, WordPress, MariaDB, Postgres and fx-mcp; gateway-labelled and setup-labelled control pods reach their allowed targets.
+- Manual checks (Ash, all PASS): admin login with a valid Let's Encrypt cert in Chrome; llm-api Secret created and gateway restarted, chat "what orders were placed today" called woo__list_orders and answered correctly; COD order 14 (Coffee Mug + Classic T-Shirt) placed at the shop and found by chat; MCP Inspector 2.11.0 over Streamable HTTP to `/mcp` with a fresh API key connected and listed 10 tools.
+- Gotcha: the SSH tunnel dropped once after about 1h idle. Start it with `-o ServerAliveInterval=30`.
