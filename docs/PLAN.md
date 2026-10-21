@@ -138,11 +138,22 @@ In this order:
 - **Accept:** DoD flow works at the public hostname; README lists exactly what differs from local.
 
 ## Phase 9: Docs + demo
-- [ ] README: local setup, VPS setup, place an order, connect an MCP client, use chat
-- [ ] `docs/DESIGN.md` (architecture, aggregation, routing, failure handling, prod changes)
-- [ ] `docs/THREAT_MODEL.md` (the four required questions)
+
+### A. Fixes (do first; CI and the demo depend on them)
+- [ ] Fix flaky `test/mcp-endpoint.test.ts`: find the root cause (timing, port, shared state or ordering), no retries or skips; proof: 20 consecutive green runs of the file and 5 of full `make test`
+- [ ] Guard hook polish: no false deny when a command ends in a backtick; file names like push-images.sh or ENV=prod as plain text inside read-only commands (grep, cat, git log/diff, ls) must not prompt; hook tests for both plus regression cases proving real ENV=prod deploy/delete/ssh commands still prompt
+- [ ] restore-check takes a fresh backup first (Job from the backup CronJob, wait, then compare the newest dump to the live DB)
+
+### B. Docs
+- [ ] `docs/THREAT_MODEL.md`: the four required questions from ASSIGNMENT.md, plus known-risk lines, each with mitigation or "accepted, why": invite token in the URL (ADR 014); notes cross-user injection (ADR 011); own images pinned by tag, not digest; audit redaction never blocks the row write; upstream pagination and size caps; irreversible order status changes; prompt injection via Woo text
   - include: mu-plugin trusts missing X-Forwarded-For; safe only while store NetworkPolicy limits direct callers to woo-mcp + setup Job (ADR 024)
-- [ ] GitHub Actions CI: make lint + tests on every push (stand-out item)
-- [ ] Stand-out items list with file pointers
-- [ ] Stand-out list: #1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI.
-- [ ] Demo script following the six required video sections; record
+- [ ] Future-work section: admin one-time password reset link, disabled-login hint on the Members page, agent system-prompt line against guessed facts, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons: multi-store, OAuth, hosted servers, many tools
+- [ ] README local section: prerequisites (Windows + Git Bash + Docker Desktop, macOS/Linux notes), cluster-up, secrets, deploy, place an order, connect an MCP client, use the chat, known gotchas (fresh cluster = new admin password, Chrome autofill lockout and how to clear it)
+- [ ] `docs/DESIGN.md` if missing: architecture, aggregation, routing, failure handling, local vs prod differences; link the ADRs instead of repeating them
+- [ ] Stand-out items list with file pointers (#1 VPS, #2 tool permissions, #6 hardening, #7 rate limits, #9 upgrade/rollback, CI)
+
+### C. CI (cut first if time is tight)
+- [ ] `.github/workflows/ci.yml`: on push and PR run `make lint` and `make test`; no cluster, no secrets; pinned action versions; npm cache; pinned helm binary if lint needs one
+
+### D. Demo
+- [ ] Demo script following the six required video sections, run against the live https://app.20.197.63.44.sslip.io, with a pre-flight checklist (tunnel up, admin password from the gateway-app secret, clean browser profile so Chrome autofill can't lock you out); record
