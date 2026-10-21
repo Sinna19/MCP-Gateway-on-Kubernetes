@@ -2,11 +2,18 @@
 # Proves the newest dump on the backup PVC restores (ADR 025). A throwaway pod, labelled like the backup Job
 # (so the NetworkPolicy lets it reach Postgres), restores the dump into database restore_check and compares
 # the row count of every public table with the live database. The pod drops restore_check on exit, pass or fail.
+# First it takes a fresh dump (a Job from the backup CronJob), so writes since the nightly dump cannot cause a false DIFF;
+# the pod fails if its newest dump is older than that Job's start. SKIP_BACKUP=1 checks the newest dump as it is.
+# Retention is by age (find -mtime), so the extra dump never rotates out a nightly; it only costs disk until it ages out.
+# Accepted, no lock: a write between the new dump and the count compare (seconds), and the CronJob firing during the
+# check (two dump Jobs at once, each writes its own file).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/kube.sh
 NS="${NS:-urumi}"
 POD=gateway-restore-check
+JOB=gateway-backup-for-check
+min_dump=""
 
 image=$(kubectl -n "$NS" get statefulset gateway-postgres -o jsonpath='{.spec.template.spec.containers[0].image}')
 user=$(kubectl -n "$NS" get statefulset gateway-postgres -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="POSTGRES_USER")].value}')
@@ -14,7 +21,23 @@ secret=$(kubectl -n "$NS" get statefulset gateway-postgres -o jsonpath='{.spec.t
 db=$(kubectl -n "$NS" get statefulset gateway-postgres -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="POSTGRES_DB")].value}')
 
 kubectl -n "$NS" delete pod "$POD" --ignore-not-found --wait >/dev/null
-trap 'kubectl -n "$NS" delete pod "$POD" --ignore-not-found --wait=false >/dev/null' EXIT
+trap 'kubectl -n "$NS" delete pod "$POD" --ignore-not-found --wait=false >/dev/null; kubectl -n "$NS" delete job "$JOB" --ignore-not-found --wait=false >/dev/null' EXIT
+
+if [ "${SKIP_BACKUP:-}" != 1 ]; then
+  kubectl -n "$NS" delete job "$JOB" --ignore-not-found --wait >/dev/null
+  kubectl -n "$NS" create job "$JOB" --from=cronjob/gateway-postgres-backup >/dev/null
+  echo "taking a fresh backup ($JOB)"
+  ok=""
+  for _ in $(seq 450); do
+    [ "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.succeeded}')" = 1 ] && { ok=1; break; }
+    [ -n "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.failed}')" ] && break
+    read -t 2 <> <(:) || true
+  done
+  [ -n "$ok" ] || { kubectl -n "$NS" logs "job/$JOB" --tail=20; echo "backup Job did not succeed"; exit 1; }
+  # Job start (2026-10-21T11:50:03Z) in dump-name form; the dump is named after the pod start, so it sorts at or after this.
+  start=$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.startTime}' | tr -d '\r:-')
+  min_dump="gateway-$start.dump"
+fi
 
 # The script text is passed as the container args (not through a shell here), $-signs are for the pod's sh.
 kubectl -n "$NS" apply -f - >/dev/null <<YAML
@@ -43,6 +66,7 @@ spec:
         - {name: PGHOST, value: gateway-postgres}
         - {name: PGUSER, value: "$user"}
         - {name: LIVE_DB, value: "$db"}
+        - {name: MIN_DUMP, value: "$min_dump"}
         - name: PGPASSWORD
           valueFrom: {secretKeyRef: {name: "$secret", key: password}}
       command:
@@ -56,6 +80,10 @@ spec:
           for i in \$(seq 30); do pg_isready -q && break; sleep 2; done
           f=\$(ls -t /backups/gateway-*.dump | head -1)
           echo "restoring \$f"
+          # File names sort by time. An empty MIN_DUMP (SKIP_BACKUP=1) accepts any dump.
+          if [ -n "\$MIN_DUMP" ] && [ "\$(printf '%s\n%s\n' "\$MIN_DUMP" "\$(basename "\$f")" | sort | head -1)" != "\$MIN_DUMP" ]; then
+            echo "stale dump: \$f is older than \$MIN_DUMP"; exit 1
+          fi
           psql -d "\$LIVE_DB" -qc 'DROP DATABASE IF EXISTS restore_check' -c 'CREATE DATABASE restore_check'
           pg_restore -d restore_check --no-owner "\$f"
           bad=0

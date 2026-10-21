@@ -142,7 +142,7 @@ In this order:
 ### A. Fixes (do first; CI and the demo depend on them)
 - [x] Fix flaky `test/mcp-endpoint.test.ts`: find the root cause (timing, port, shared state or ordering), no retries or skips; proof: 20 consecutive green runs of the file and 5 of full `make test`
 - [x] Guard hook polish: no false deny when a command ends in a backtick; file names like push-images.sh or ENV=prod as plain text inside read-only commands (grep, cat, git log/diff, ls) must not prompt; hook tests for both plus regression cases proving real ENV=prod deploy/delete/ssh commands still prompt
-- [ ] restore-check takes a fresh backup first (Job from the backup CronJob, wait, then compare the newest dump to the live DB)
+- [x] restore-check takes a fresh backup first (Job from the backup CronJob, wait, then compare the newest dump to the live DB)
 
 ### B. Docs
 - [ ] `docs/THREAT_MODEL.md`: the four required questions from ASSIGNMENT.md, plus known-risk lines, each with mitigation or "accepted, why": invite token in the URL (ADR 014); notes cross-user injection (ADR 011); own images pinned by tag, not digest; audit redaction never blocks the row write; upstream pagination and size caps; irreversible order status changes; prompt injection via Woo text

@@ -11,7 +11,7 @@ The gateway database holds users, API key hashes, audit log and encrypted upstre
 - **NetworkPolicy**: backup pod egress to DNS and Postgres only, no ingress. Postgres ingress allows label `gateway-postgres-backup`.
 - **Waits for Postgres**: a new pod's IP is refused by kube-router for a few seconds, so the script loops on `pg_isready` first.
 - **Off-box copy**: `make backup-pull` runs `pg_dump -Fc` through `kubectl exec` into `backups/` (gitignored, keeps the newest 7 per cluster). The PVC lives on the same disk as the data, so only this copy survives losing the VPS.
-- **Restore proof**: `make restore-check` starts a throwaway pod (backup label, PVC mounted read-only), restores the newest dump into database `restore_check`, compares the row count of every public table with the live database, drops it. Prints `RESTORE CHECK: PASS` or `FAIL`.
+- **Restore proof**: `make restore-check` first takes a fresh dump (Job from the CronJob; `SKIP_BACKUP=1` skips it; the pod fails if its newest dump is older than that Job), then starts a throwaway pod (backup label, PVC mounted read-only), restores the newest dump into database `restore_check`, compares the row count of every public table with the live database, drops it. Prints `RESTORE CHECK: PASS` or `FAIL`.
 - Manual run: `kubectl -n urumi create job --from=cronjob/gateway-postgres-backup bk1`.
 
 ## Restore for real
