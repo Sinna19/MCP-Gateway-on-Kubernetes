@@ -145,7 +145,7 @@ In this order:
 - [x] restore-check takes a fresh backup first (Job from the backup CronJob, wait, then compare the newest dump to the live DB)
 
 ### B. Docs
-- [ ] `docs/THREAT_MODEL.md`: the four required questions from ASSIGNMENT.md, plus known-risk lines, each with mitigation or "accepted, why": invite token in the URL (ADR 014); notes cross-user injection (ADR 011); own images pinned by tag, not digest; audit redaction never blocks the row write; upstream pagination and size caps; irreversible order status changes; prompt injection via Woo text
+- [x] `docs/THREAT_MODEL.md`: the four required questions from ASSIGNMENT.md, plus known-risk lines, each with mitigation or "accepted, why": invite token in the URL (ADR 014); notes cross-user injection (ADR 011); own images pinned by tag, not digest; audit redaction never blocks the row write; upstream pagination and size caps; irreversible order status changes; prompt injection via Woo text
   - include: mu-plugin trusts missing X-Forwarded-For; safe only while store NetworkPolicy limits direct callers to woo-mcp + setup Job (ADR 024)
 - [ ] Future-work section: admin one-time password reset link, disabled-login hint on the Members page, agent system-prompt line against guessed facts, audit rejected 429/401 /mcp requests; skipped bonuses with one-line reasons: multi-store, OAuth, hosted servers, many tools
 - [ ] README local section: prerequisites (Windows + Git Bash + Docker Desktop, macOS/Linux notes), cluster-up, secrets, deploy, place an order, connect an MCP client, use the chat, known gotchas (fresh cluster = new admin password, Chrome autofill lockout and how to clear it)
