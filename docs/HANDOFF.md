@@ -1,25 +1,22 @@
 # Handoff
-## Done this session
-- Phase-7 review fixes, all 13 findings handled: `1138a28 fix: phase-7 review findings ...`
-  - dod-check refuses non-k3d contexts unless `DOD_ALLOW_PROD=1` (`ENV=prod make dod` sets it); ADR 024 notes the standing `dod-member` user.
-  - Backup CronJob: `activeDeadlineSeconds: 900`, `startingDeadlineSeconds: 3600`, `umask 077`; backup-pull trap + umask 077.
-  - Hook guards exec/cp/label/annotate/set/run/taint/uncordon/rollout undo and ssh azureuser@ / k3s kubectl; fixtures extended.
-  - restore-check: in-pod EXIT trap drops restore_check, names read from the StatefulSet, pod resources set.
-  - `push-images` fails on uncommitted services/apps; `checksum/mu-plugin` on WordPress Deployment and setup Job; dashboard ingress `if`; stale Makefile message.
-  - PLAN phase 9 THREAT_MODEL list has the mu-plugin X-Forwarded-For line.
-- Proof: `make lint`, `make test`, hook tests ok. k3d: `make dod` 8/8 (a forced `DOD_WAIT=1` failure still restored notes replicas=1), backup Job complete (dump mode 600), `make restore-check` PASS.
-- VPS: `ENV=prod make deploy` ok (setup-6), `ENV=prod make restore-check` PASS after a fresh dump, `ENV=prod make dod` 9/9; the unflagged script refused.
+## Done this session (Phase 9, group A items 1-2)
+- `1df2a7d` PLAN.md Phase 9 rewritten as groups A (fixes), B (docs), C (CI), D (demo).
+- `2416646` mcp-endpoint flake fixed. Cause: `listRequest` never read the body; /mcp sends SSE headers before the handler ends, so a `tool_rules JOIN upstream_servers` query was still running when the next `beforeEach` TRUNCATE ... CASCADE deadlocked. `app.sweep()` now returns the purge promise (second leak, same shape). Proof: file 20/20 (was ~1 in 5), `make test` 5/5, lint ok.
+- `f9a4426` guard hook: read-only segments (grep/cat/ls/git log...) ignored unless they hold `$(` backtick `<(` `>(`; context names lose `" ' `` ` `` and stop at `)`; closed a gap where `` `kubectl ...` `` / `$(kubectl ...)` was never matched. 59 fixture checks, `hook tests: ok`. This commit also ticked the A1 box.
 
 ## In progress
-- Nothing half-finished. The handoff and rules edits are the only changes after `1138a28`.
+- Nothing half-finished. Working tree is clean after this commit.
 
 ## Next step
-`9 THREAT_MODEL` (docs/THREAT_MODEL.md, the four required questions, including the mu-plugin line in PLAN phase 9).
+`9 A3 restore-check takes a fresh backup first` (plan: `C:\Users\aashi\.claude\plans\pasted-content-id-c503-phase-9-immutable-fairy.md`, section A3, includes the user's approved tweaks).
+- Job from `cronjob/gateway-postgres-backup`, wait, pass `MIN_DUMP` to the pod and fail if the newest dump is older; print the file name; `SKIP_BACKUP=1` keeps old behaviour.
+- Retention is by age (`find -mtime`), so the extra dump never rotates out a nightly: note it in the header comment. Accept the CronJob-overlap race, no lock.
+- Prove on k3d only: `make dod`, `SKIP_BACKUP=1 make restore-check` (expect DIFF audit_log), `make restore-check` (PASS), no `for-check` Job left. No `ENV=prod` without asking.
 
 ## Gotchas learned
-- restore-check false-fails on any write since the last dump; take a fresh dump first (now in `.claude/rules/kubernetes.md`).
-- Raw kubectl against the VPS needs KUBECONFIG exported; the hook denies commands that merely mention a foreign context (use a script file).
-- Optional later: make restore-check take its own dump so it cannot false-fail.
+- Process start is ~0.5 s on this machine, so a hook call is ~2 s and `bash .claude/hooks/test-guard-kube-context.sh` takes ~70 s (run it with `timeout 180`; it is not hung). Added to kubernetes.md.
+- The guard hook denies any command whose text mentions a foreign `--context`: write fixtures/loops to a file with Write, then run the file.
+- Reads under `node_modules` are denied, so SDK behaviour is observed, not quoted.
 
 ## Files the next task needs
-- docs/REQUIREMENTS.md (security questions), docs/PLAN.md (phase 9), docs/decisions/019 (NetworkPolicy), 023 (credentials key), 024, 025
+- scripts/restore-check.sh, charts/gateway/templates/backup-cronjob.yaml, docs/decisions/025 (one line), .claude/rules/kubernetes.md (restore-check line), docs/PLAN.md (tick A3)
