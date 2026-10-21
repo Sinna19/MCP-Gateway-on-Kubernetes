@@ -130,8 +130,8 @@ In this order:
 - [x] `deploy/values-prod.yaml`: real hosts, storage class, ingress class, optional cert-manager issuer, resource sizes
 - [x] Secrets created on the server via script, never committed (`scripts/secrets.sh`, run by `make deploy`)
 - [x] TLS: `global.ingress.annotations` for a cert-manager issuer, so `ingress.tls` has a Secret to use
-- [ ] VPS is single-node: setup Job and WordPress share an RWO PVC; say so in README (podAffinity if ever multi-node)
-- [ ] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
+- [x] VPS is single-node: setup Job and WordPress share an RWO PVC; say so in README (podAffinity if ever multi-node)
+- [x] Upgrade + rollback rehearsal: `helm upgrade`, `helm history`, `helm rollback`
 - [x] k3s `--secrets-encryption` so Secrets are encrypted at rest (evidence: `sudo k3s secrets-encrypt status` 2026-10-20, Enabled, AES-CBC, run by Ash on the node)
 - [x] Postgres backups for the gateway database: CronJob + PVC + NetworkPolicy, `make backup-pull`, `make restore-check` PASS on k3d and VPS (ADR 025)
 - [x] Session 2b done 2026-10-21: prod Let's Encrypt certs, `make dod` 9/9 on https with cookie Secure PASS, deny probes, login/chat/COD order/MCP Inspector verified (ADR 024)

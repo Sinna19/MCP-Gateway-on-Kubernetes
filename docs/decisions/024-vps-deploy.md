@@ -28,3 +28,10 @@ Both Certificates (`gateway-tls`, `store-wordpress-tls`) became Ready on the fir
 - NetworkPolicy deny probes: an unlabelled pod is blocked to woo-mcp, WordPress, MariaDB, Postgres and fx-mcp; gateway-labelled and setup-labelled control pods reach their allowed targets.
 - Manual checks (Ash, all PASS): admin login with a valid Let's Encrypt cert in Chrome; llm-api Secret created and gateway restarted, chat "what orders were placed today" called woo__list_orders and answered correctly; COD order 14 (Coffee Mug + Classic T-Shirt) placed at the shop and found by chat; MCP Inspector 2.11.0 over Streamable HTTP to `/mcp` with a fresh API key connected and listed 10 tools.
 - Gotcha: the SSH tunnel dropped once after about 1h idle. Start it with `-o ServerAliveInterval=30`.
+
+## Proof on the VPS (upgrade and rollback rehearsal, 2026-10-21)
+- Before: `helm history platform` revisions 1-3, current N=3 (rev 3 = Postgres backup, after the letsencrypt-prod flip). Gateway env `MCP_CALLS_PER_MINUTE=60`.
+- The chart has no `podAnnotations`, so the harmless value was `gateway.limits.mcp.callsPerMinute=61` (well above dod-check's 12 calls per key).
+- Upgrade: `ENV=prod make deploy HELM_EXTRA="--set gateway.limits.mcp.callsPerMinute=61"` -> revision 4 deployed, new pod `gateway-56d694fcd4-xpgzj` Running with value 61, `curl -sI https://app.20.197.63.44.sslip.io/healthz` 200.
+- Rollback: `helm rollback platform 3 -n urumi --wait` -> revision 5 "Rollback to 3", new pod `gateway-64769f79bc-f67r2` Running with value 60, `gateway-tls` and `store-wordpress-tls` Ready on `letsencrypt-prod`, healthz 200, `ENV=prod make dod` 9 passed, 0 failed.
+- Rule kept: one revision back only, never at or before the prod-issuer flip or the backup revision; no TLS Secret or namespace deleted.
