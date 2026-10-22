@@ -178,11 +178,13 @@ describe("/api invites and members", () => {
         await holder.query("BEGIN");
         await holder.query("LOCK TABLE users IN EXCLUSIVE MODE");
         const pending = call(base, `/members/${carolId}`, { method: "PATCH", body: { role: "member" }, cookie: admin });
-        for (let i = 0; i < 100; i++) { // wait until the request is blocked on the lock
-          const waiting = await pool.query("SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND NOT granted");
-          if (waiting.rowCount) break;
-          await new Promise((r) => setTimeout(r, 20));
+        let blocked = false; // poll until a backend is waiting for a lock on users, so alice has passed auth
+        for (let i = 0; i < 250 && !blocked; i++) {
+          const waiting = await pool.query("SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND relation = 'users'::regclass AND NOT granted");
+          blocked = (waiting.rowCount ?? 0) > 0;
+          if (!blocked) await new Promise((r) => setTimeout(r, 20));
         }
+        expect(blocked).toBe(true);
         await holder.query("UPDATE users SET disabled_at = now() WHERE id = $1", [adminId]);
         await holder.query("COMMIT");
         expect((await pending).status).toBe(409);
