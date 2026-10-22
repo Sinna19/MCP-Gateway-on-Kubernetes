@@ -169,7 +169,34 @@ describe("/api invites and members", () => {
       expect((await call(base, "/me", { cookie: admin })).body.role).toBe("admin");
     });
 
+    // Sequential calls cannot reach the 409 (a demoted or disabled actor fails auth first), so hold the users lock:
+    // alice passes auth, waits on the lock, and carol's row is the only admin left once alice is disabled underneath her.
+    it("answers 409 when the other enabled admin vanishes after auth, before the guard runs", async () => {
+      const carolId = await makeUser(pool, "carol@x.io", "admin");
+      const holder = await pool.connect();
+      try {
+        await holder.query("BEGIN");
+        await holder.query("LOCK TABLE users IN EXCLUSIVE MODE");
+        const pending = call(base, `/members/${carolId}`, { method: "PATCH", body: { role: "member" }, cookie: admin });
+        for (let i = 0; i < 100; i++) { // wait until the request is blocked on the lock
+          const waiting = await pool.query("SELECT 1 FROM pg_locks WHERE locktype = 'relation' AND NOT granted");
+          if (waiting.rowCount) break;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        await holder.query("UPDATE users SET disabled_at = now() WHERE id = $1", [adminId]);
+        await holder.query("COMMIT");
+        expect((await pending).status).toBe(409);
+      } finally {
+        holder.release();
+      }
+      const left = await pool.query("SELECT 1 FROM users WHERE role = 'admin' AND disabled_at IS NULL");
+      expect(left.rowCount).toBe(1); // carol is untouched
+    });
+
     // Each admin passes the auth check before the other's change lands, so only the transaction can stop both.
+    // Two valid orderings: if one demotion commits before the other request passes auth, that request gets 403
+    // (its caller is no longer an admin); if both pass auth first, the loser hits the last-admin guard and gets 409.
+    // Either way exactly one enabled admin remains, and never two 200s.
     it.each([{ role: "member" }, { disabled: true }])("two admins removing each other at once leaves one enabled admin (%j)", async (change) => {
       const otherId = await makeUser(pool, "carol@x.io", "admin");
       await pool.query("UPDATE users SET role = 'member' WHERE id = $1", [memberId]); // admins are alice and carol only
@@ -178,7 +205,10 @@ describe("/api invites and members", () => {
         call(base, `/members/${otherId}`, { method: "PATCH", body: change, cookie: admin }),
         call(base, `/members/${adminId}`, { method: "PATCH", body: change, cookie: carol }),
       ]);
-      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      const statuses = [a.status, b.status].sort();
+      expect(statuses[0]).toBe(200);
+      // the early loser is a demoted admin (403) or, when disabled, a dead session (401)
+      expect([change.role ? 403 : 401, 409]).toContain(statuses[1]);
       const left = await pool.query("SELECT 1 FROM users WHERE role = 'admin' AND disabled_at IS NULL");
       expect(left.rowCount).toBe(1);
     });
