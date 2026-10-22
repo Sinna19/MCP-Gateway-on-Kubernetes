@@ -11,17 +11,20 @@ Target about 15 minutes total. `docs/ASSIGNMENT.md` sets no video length limit (
 
 Everything below touches the live VPS, so it is for me to run, not Claude.
 
+0. **Azure portal:** `urumi-vps-nsg` SSH rule (priority 340), Source = My IP address, Save, wait 30 s (my home IP changes daily). Without this the tunnel in step 2 times out.
 1. **Cluster is not reset.** Do not run `cluster-down`, `cluster-up` or anything that deletes TLS Secrets. "Fresh" here means a clean browser profile and fresh credentials, not a fresh cluster.
 2. **SSH tunnel up** in its own terminal, with the keepalive (it dropped once after about 1 h idle, ADR 024):
 
-        ssh -o ServerAliveInterval=30 -N -L 6443:127.0.0.1:6443 <user>@<vps-ip>
+        ssh -i ~/.ssh/urumi-vps -o ServerAliveInterval=30 -N -L 16443:127.0.0.1:6443 azureuser@20.197.63.44
+
+   Local port 16443 matches `server: https://127.0.0.1:16443` in `~/.kube/urumi-vps.yaml`. (README VPS section still says local 6443; the kubeconfig is what counts.)
 
 3. **kubectl works against the VPS** (Git Bash):
 
         export KUBECONFIG=~/.kube/urumi-vps.yaml
         kubectl --context urumi-vps -n urumi get pods
 
-   Expect every pod 1/1 Running, `setup-*` Completed. Also `helm --kube-context urumi-vps history platform -n urumi` and write down the current revision number N for section 6 (it was 5 after the rehearsal).
+   Expect every pod 1/1 Running, `setup-*` Completed. Also `helm --kube-context urumi-vps history platform -n urumi` and check the current revision is 7 (a one-step rollback would target 6) and use that in section 6.
 4. **Admin password** (copy, do not print on screen; paste into the login form during the recording):
 
         kubectl --context urumi-vps -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d | clip
@@ -33,7 +36,7 @@ Everything below touches the live VPS, so it is for me to run, not Claude.
 9. **Fresh API key for B**, created by B on the Keys page (shown once, starts with `umk_`). Revoke any older B keys so Section 4's revoke is unambiguous. Keep it in the clipboard or a file outside the repo (`~/.urumi-demo/b.hdr`, containing `Authorization: Bearer umk_...`).
 10. **MCP client config ready** (the key stays out of frame):
     - MCP Inspector (proven in the rehearsal): transport Streamable HTTP, URL `https://app.20.197.63.44.sslip.io/mcp`, header `Authorization: Bearer <B's key>`. Have it open and connected, then disconnect so the connect is shown live.
-    - Claude Code, for the two-upstream prompt (untested, rehearse once): `claude mcp add --transport http urumi-demo https://app.20.197.63.44.sslip.io/mcp --header "Authorization: Bearer umk_..."`. Remove it after (`claude mcp remove urumi-demo`).
+    - Claude Code, for the two-upstream prompt (untested, rehearse once). Off camera, from a scratch folder OUTSIDE the repo (`mkdir -p ~/urumi-demo-scratch && cd ~/urumi-demo-scratch`), default local scope, never `--scope project` (it would write the key into a `.mcp.json`): `claude mcp add --transport http urumi-demo https://app.20.197.63.44.sslip.io/mcp --header "Authorization: Bearer umk_..."`. Run `claude mcp remove urumi-demo` right after section 1.
 11. **Terminal and screen.** Terminal font 18 to 20 pt, window about 100 columns, dark background, browser zoom 125%. Close other tabs, Slack and notifications. Terminal tabs ready: (T1) tunnel, (T2) kubectl with `KUBECONFIG` exported, (T3) spare for curl.
 12. **Pre-type** the long commands in a scratch file (not in the repo) so the recording is not spent typing.
 13. **Rehearse sections 1 and 3 once** with the clock running; they carry the live risk.
@@ -63,11 +66,11 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
 **Live steps:**
 
 1. Dashboard login as A: https://app.20.197.63.44.sslip.io (paste password). Servers page: woo, fx, notes Connected with tool counts. Point out `notes__list_products` next to `woo__list_products` (the collision, explained in section 3).
-2. Store: https://shop.20.197.63.44.sslip.io, add a product, check out with cash on delivery. Open `https://shop.20.197.63.44.sslip.io/wp-admin` (user from the store setup; password: `kubectl --context urumi-vps -n urumi get secret store-wp-admin -o jsonpath='{.data.password}' | base64 -d | clip`, copy, do not show) and show WooCommerce > Orders. **Expected:** the order is listed.
+2. Store: https://shop.20.197.63.44.sslip.io, add a product, check out with cash on delivery. Open `https://shop.20.197.63.44.sslip.io/wp-admin` (user `admin`; password: `kubectl --context urumi-vps -n urumi get secret store-wp-admin -o jsonpath='{.data.password}' | base64 -d | clip`, copy, do not show) and show WooCommerce > Orders. **Expected:** the order is listed.
 3. Dashboard Chat as A: "Create a product called Demo Mug priced 19.99". **Expected:** a confirm card (write tool); click Confirm; the product appears on the storefront (refresh the shop).
 4. Order Demo Mug on the shop by hand (COD). Chat: "What orders came in today?". **Expected:** one `woo__list_orders` call with no confirm card; the reply lists the new order. (Known limit: "today" is the UTC day, so an order at 00:00 to 05:30 IST counts as yesterday; ask "orders after" the date if the clock is awkward.)
 5. User B, external client (Inspector, URL + key only): connect. **Expected:** server `urumi-gateway`, tools from all three upstreams, no `woo__create_product` (admin-only). Run `woo__list_orders`. **Expected:** the same order. Then `fx__convert_currency` and `notes__add_note` to show three upstreams from one client.
-6. Two-upstream prompt, in Claude Code connected as B: "Take the total of today's orders and convert it to EUR." **Expected:** calls `woo__list_orders` then `fx__convert_currency`. If the model misbehaves, repeat the same prompt in the dashboard chat as A, which has the same tools (see "cannot show yet").
+6. Two-upstream prompt, in Claude Code (started from the scratch folder) connected as B: "Take the total of today's orders and convert it to EUR." **Expected:** calls `woo__list_orders` then `fx__convert_currency`. If the model misbehaves, repeat the same prompt in the dashboard chat as A, which has the same tools (see "cannot show yet").
 
 ## 2. Kubernetes (about 2.5 min)
 
@@ -132,7 +135,7 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
 
 ## 5. Chat agent (about 1.5 min)
 
-**On screen:** `docs/explain/chat-agent.md` or `services/gateway/src` chat file named in ADR 017 (one screen), then the Chat page.
+**On screen:** `docs/explain/chat-agent.md` or `services/gateway/src/chat/agent.ts` (the loop, ADR 017; one screen), then the Chat page.
 
 **Say:** "The chat is a loop in the gateway: it sends the user's messages and the tools their role allows to an OpenAI-compatible LLM, runs the tool calls it asks for, and feeds the results back until it answers. Each call goes through the same `Gateway.callTool(user, ...)` as `/mcp`, so the role check, routing, timeout and audit row are identical and attributed to the logged-in user. Read tools run on their own; every other tool needs a Confirm that the server remembers, so the model cannot approve itself."
 
@@ -151,10 +154,10 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
 3. Helm history: `helm --kube-context urumi-vps history platform -n urumi`.
 4. **Upgrade and rollback, explained, not executed live** (rehearsed on 2026-10-21, ADR 024). Show the commands from README "Upgrade and rollback":
 
-        ENV=prod make deploy HELM_EXTRA="--set gateway.limits.mcp.callsPerMinute=61"        # revision N+1
-        helm --kube-context urumi-vps rollback platform <N> -n urumi --wait                  # back exactly one revision
+        ENV=prod make deploy HELM_EXTRA="--set gateway.limits.mcp.callsPerMinute=61"        # upgrade, new revision
+        helm --kube-context urumi-vps rollback platform 6 -n urumi --wait                    # from current 7: exactly one revision back
 
-   Say: "Rollback goes to the revision just before the upgrade, only one step back, and never at or before the Let's Encrypt prod switch or the backup change; an older one would bring the staging issuer back. Rollback does not touch PVC data or the TLS and app Secrets." `<N>` is the revision noted in checklist step 3. If I do execute it, it is one revision back only.
+   Say: "Rollback goes to the revision just before the upgrade, only one step back, and never at or before the Let's Encrypt prod switch or the backup change; an older one would bring the staging issuer back. Rollback does not touch PVC data or the TLS and app Secrets." Current revision is 7, so a one-step rollback targets 6 (explained, not executed; the 2026-10-21 rehearsal went 4 to 3 in ADR 024).
 
 ## Demo points the repo cannot show yet (or only partly)
 
