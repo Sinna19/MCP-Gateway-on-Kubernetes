@@ -1,22 +1,26 @@
 # Handoff
-## Done this session (Phase 9: review fixes)
-- `/phase-review phase-8` found 4 items; all fixed in 70a0d0c (`fix: phase 9 review findings`), pushed.
-- `scripts/restore-check.sh`: wait loop polls Job conditions (Complete/Failed), not `.status.failed`; the pod picks the dump by name (`ls | sort | tail -1`); MIN_DUMP comment cites `charts/gateway/templates/backup-cronjob.yaml:68`, example timestamp removed.
-- `.claude/hooks/guard-kube-context.sh`: read-only segments with `--pre`, `--ext-diff`, `--output`, `-O` or `--open-files-in-pager` are still scanned; the mutating pattern now also matches a kubectl/helm right after a quote.
-- Proof (k3d only): `make restore-check` -> RESTORE CHECK: PASS (gateway-20261022T062410Z.dump); hook tests ok (62 checks); `make lint` ok; `make test` ok. No ENV=prod.
+
+## Done this session
+- 3d67f1f docs: demo script fixes (docs/DEMO_SCRIPT.md only, pushed). make lint ok.
+  - Added checklist step 0 (Azure NSG rule urumi-vps-nsg, priority 340, My IP).
+  - Tunnel command now `ssh -i ~/.ssh/urumi-vps ... -L 16443:127.0.0.1:6443 azureuser@20.197.63.44` (matches ~/.kube/urumi-vps.yaml).
+  - Helm: current revision 7, one-step rollback targets 6 (explained, not executed).
+  - Claude Code connect: run from a scratch folder outside the repo, local scope, remove right after section 1.
+  - wp-admin user is `admin` (secret store-wp-admin, key password); chat file is services/gateway/src/chat/agent.ts.
+  - Verified unchanged: HELM_EXTRA, gateway.limits.mcp.callsPerMinute, gateway limits 500m/256Mi, health 5 s, timeout 15 s, ADR 024 pointers.
 
 ## In progress
-- Nothing half-finished. The recording itself is still to do (Ash).
+- Nothing half-finished.
+- README.md:80-82 still says local port 6443 for the tunnel, but the kubeconfig uses 16443. Fix when README is next touched.
 
 ## Next step
-`9 D record`: Ash works through the checklist in `docs/DEMO_SCRIPT.md`, rehearses sections 1 and 3 once, then records. After that, only the submission form remains (https://forms.gle/nftwgyNeenSDmiRb6).
+`/demo-prep` rehearsal: run the pre-recording checklist in docs/DEMO_SCRIPT.md (steps 0 to 14), then record.
 
 ## Gotchas learned
-- Hook gate only fires on a mutating kubectl/helm verb or a `vps_action` marker; a bare `urumi-vps` in a flag value is not gated. The `git diff --ext-diff --output=x` fixture therefore carries `ENV=prod`.
-- `ENV=prod make dod` scales notes-mcp to 0 and disables fx itself: do not run it during the recording.
-- Disabling fx: the chat model may answer a currency question from memory. Prove it with the Audit page and the tool list.
-- Never delete TLS Secrets or the namespace on the VPS; roll back one Helm revision at most.
-- Cannot show live: a timeout, the two-upstream single prompt through an LLM client, Claude Code/Desktop snippets. Full list at the end of DEMO_SCRIPT.md.
+- Home IP changes daily: the NSG SSH rule must be updated in the Azure portal before the tunnel works.
+- Never use `--scope project` for `claude mcp add`; it writes the API key into .mcp.json.
+- The `urumi` MCP server configured in Claude Code currently fails with 401 (invalid or missing API key); needs a fresh key.
 
 ## Files the next task needs
-- docs/DEMO_SCRIPT.md (checklist and sections), docs/REHEARSAL.md only if a step fails
+- docs/DEMO_SCRIPT.md
+- README.md (VPS section, lines 76-125)
