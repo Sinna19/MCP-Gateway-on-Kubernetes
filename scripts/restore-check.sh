@@ -29,12 +29,14 @@ if [ "${SKIP_BACKUP:-}" != 1 ]; then
   echo "taking a fresh backup ($JOB)"
   ok=""
   for _ in $(seq 450); do
-    [ "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.succeeded}')" = 1 ] && { ok=1; break; }
-    [ -n "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.failed}')" ] && break
+    # Terminal conditions only: a failed pod that the backoffLimit retry recovers is not a failure.
+    [ "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" = True ] && { ok=1; break; }
+    [ "$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}')" = True ] && break
     read -t 2 <> <(:) || true
   done
   [ -n "$ok" ] || { kubectl -n "$NS" logs "job/$JOB" --tail=20; echo "backup Job did not succeed"; exit 1; }
-  # Job start (2026-10-21T11:50:03Z) in dump-name form; the dump is named after the pod start, so it sorts at or after this.
+  # Job start (ISO 8601 UTC) in dump-name form. Depends on the name gateway-YYYYMMDDTHHMMSSZ.dump set at
+  # charts/gateway/templates/backup-cronjob.yaml:68; the dump is named after the pod start, so it sorts at or after this.
   start=$(kubectl -n "$NS" get job "$JOB" -o jsonpath='{.status.startTime}' | tr -d '\r:-')
   min_dump="gateway-$start.dump"
 fi
@@ -78,9 +80,9 @@ spec:
           trap 'psql -d "\$LIVE_DB" -qc "DROP DATABASE IF EXISTS restore_check"' EXIT
           # A new pod's IP is refused by the NetworkPolicy for a few seconds, so wait for Postgres.
           for i in \$(seq 30); do pg_isready -q && break; sleep 2; done
-          f=\$(ls -t /backups/gateway-*.dump | head -1)
+          f=\$(ls /backups/gateway-*.dump | sort | tail -1)
           echo "restoring \$f"
-          # File names sort by time. An empty MIN_DUMP (SKIP_BACKUP=1) accepts any dump.
+          # File names sort by time, so the pick above and this compare use the same (name) order. An empty MIN_DUMP (SKIP_BACKUP=1) accepts any dump.
           if [ -n "\$MIN_DUMP" ] && [ "\$(printf '%s\n%s\n' "\$MIN_DUMP" "\$(basename "\$f")" | sort | head -1)" != "\$MIN_DUMP" ]; then
             echo "stale dump: \$f is older than \$MIN_DUMP"; exit 1
           fi

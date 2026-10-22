@@ -71,6 +71,9 @@ check ask   k3d-urumi 'grep x $(ENV=prod make deploy)'
 check ask   k3d-urumi 'cat <(ssh azureuser@20.197.63.44 uptime)'
 check ask   k3d-urumi 'ls `ENV=prod make deploy`'
 check ask   k3d-urumi 'git -C dir log --grep push-images.sh'
+check ask   k3d-urumi "rg --pre 'kubectl --context urumi-vps delete ns x' foo"
+check ask   k3d-urumi 'git diff --ext-diff --output=x ENV=prod'
+check ask   k3d-urumi 'git log --output=y ENV=prod'
 # Real prod commands still prompt (or deny), alone or chained after a read-only one.
 check ask   k3d-urumi 'ENV=prod make deploy'
 check ask   k3d-urumi 'ENV=prod make dod'
