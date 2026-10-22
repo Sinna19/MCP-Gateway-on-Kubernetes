@@ -77,9 +77,9 @@ Tested on one Azure B2als_v2 (Ubuntu) running k3s `v1.35.5+k3s1` with `--secrets
 2. Install k3s on the node, then check `sudo k3s secrets-encrypt status` says Enabled.
 3. Open the API through an SSH tunnel and keep it open in its own terminal (`ServerAliveInterval` stops it dropping when idle):
 
-        ssh -o ServerAliveInterval=30 -N -L 6443:127.0.0.1:6443 <user>@<vps-ip>
+        ssh -i ~/.ssh/urumi-vps -o ServerAliveInterval=30 -N -L 16443:127.0.0.1:6443 azureuser@<VPS IP>
 
-   `~/.kube/urumi-vps.yaml` points at `https://127.0.0.1:6443`, context `urumi-vps`.
+   `~/.kube/urumi-vps.yaml` points at `https://127.0.0.1:16443`, context `urumi-vps`.
 4. Run the targets in this order, each with `ENV=prod`:
 
         ENV=prod make ping            # tunnel and kubeconfig work
