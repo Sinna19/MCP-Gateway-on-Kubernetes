@@ -43,6 +43,8 @@ Everything below touches the live VPS, so it is for me to run, not Claude.
     - Each take: new B email (members can only be disabled, not deleted), a fresh B key, a new product name. Revoke B's key on camera every take.
 12. **Pre-type** the long commands in a scratch file (not in the repo) so the recording is not spent typing.
 13. **Rehearse sections 1 and 3 once** with the clock running; they carry the live risk.
+13a. **Second key for B, ready for section 1 step 7.** As B (Guest window), generate a second key off camera; from the scratch folder run `claude mcp add` with it, so section 1 step 7 is ready. Remove it in step 14.
+13b. **Chat budget per take:** A sends 4 chat prompts, B sends 2 (Claude Code and Inspector don't count). Mock and final takes on different UTC days (resets 05:30 IST), or confirm the daily cap covers both.
 14. After recording: revoke B's second key (the Claude Code one) on B's My Keys page, and run `claude mcp remove urumi-demo`. Then confirm `kubectl --context urumi-vps -n urumi get deploy` shows notes-mcp 1/1 and fx enabled on the Servers page.
 
 ## Definition-of-done flow, mapped to sections
@@ -88,7 +90,7 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
     kubectl --context urumi-vps -n urumi get netpol
     kubectl --context urumi-vps -n urumi describe netpol | grep -A6 -E "^Name:.*(woo-mcp|default-deny)"
 
-**Say:** "Namespaces: `urumi` for the app, `cert-manager` for certificates, `kube-system` for k3s and Traefik. Secrets are created by a script, never committed, and k3s encrypts them at rest. MariaDB, WordPress content and Postgres sit on `local-path` PVCs. Only three Ingresses are public (shop, dashboard and gateway on one host); woo-mcp, fx, notes, MariaDB and Postgres are ClusterIP behind a default-deny NetworkPolicy, and woo-mcp accepts only the gateway and also requires its own bearer token."
+**Say:** "Namespaces: `urumi` for the app, `cert-manager` for certificates, `kube-system` for k3s and Traefik. Secrets are created by a script, never committed, and k3s encrypts them at rest. MariaDB, WordPress content and Postgres sit on `local-path` PVCs. Only two hostnames are public: the shop, and the app host that serves the dashboard and the gateway's /mcp; woo-mcp, fx, notes, MariaDB and Postgres are ClusterIP behind a default-deny NetworkPolicy, and woo-mcp accepts only the gateway and also requires its own bearer token."
 
 **Expected result:** `urumi` pods Running and Ready with RESTARTS low; PVCs Bound; Ingress list shows only shop and app hosts and no woo-mcp; gateway has requests/limits (limit cpu 500m, memory 256Mi) and startup, liveness and readiness probes; NetworkPolicies listed including default-deny and the per-service ones.
 
@@ -153,7 +155,6 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
    - A (`admin@urumi.local`), source chat: `woo__create_product` (ok, after Confirm), `woo__list_orders` (ok), and the `fx__convert_currency` call from the disable-fx "before" step.
    - B, source mcp, Inspector: `woo__list_orders`, `fx__convert_currency`, `notes__add_note`, `woo__list_products`, `notes__list_products`, and the dead-upstream error on `notes__list_notes`.
    - B, source mcp, Claude Code: `woo__list_orders` then `fx__convert_currency` (two-upstream prompt); the three-upstream prompt adds `notes__add_note`. The permission-boundary prompt writes no row: the tool is not in B's list, so the model never calls it. A direct `woo__create_product` from Inspector would show as an `error` row ("tool not permitted for your role").
-   - B, source chat: `woo__list_products` (section 5).
    - Say: "The revoked-key call has no row: the 401 is raised before there is an authenticated user to attribute it to. That is a known gap; rejections and 429s are not audited." And: "The chat after disabling fx made no call, so it has no row either."
    - B's own Audit page (before the revoke, or log in again) shows only B's rows. **Expected:** every authenticated call is attributed to the right user.
 
@@ -163,7 +164,7 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
 
 **Say:** "The chat is a loop in the gateway: it sends the user's messages and the tools their role allows to an OpenAI-compatible LLM, runs the tool calls it asks for, and feeds the results back until it answers. Each call goes through the same `Gateway.callTool(user, ...)` as `/mcp`, so the role check, routing, timeout and audit row are identical and attributed to the logged-in user. Read tools run on their own; every other tool needs a Confirm that the server remembers, so the model cannot approve itself."
 
-**Live steps:** as B in the Guest window dashboard, Chat: "List the products in the store". **Expected:** a `woo__list_products` call, no confirm. Then "Create a product called X priced 5": **Expected:** it cannot (the tool is not in B's list), the model says so. Switch to A's Audit page: B's chat call appears under B's email.
+**Live steps:** as B in the Guest window dashboard, Chat: "List the products in the store". **Expected:** a `woo__list_products` call, no confirm. Then "Create a product called X priced 5": **Expected:** it cannot (the tool is not in B's list), the model says so. Switch to A's Audit page: B's chat call appears under B's email. Point at B's chat row (source chat, B's email) on A's Audit page.
 
 ## 6. Local-to-VPS production story (about 2.5 min)
 
