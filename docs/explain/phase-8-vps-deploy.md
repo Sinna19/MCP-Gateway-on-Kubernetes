@@ -123,5 +123,5 @@ Bonus "why not X": *Why not ArgoCD/Flux for deploys?* One cluster, one operator;
     kubectl --context urumi-vps -n urumi get certificate        # both READY=True
     curl -sI http://app.20.197.63.44.sslip.io | head -3          # 308 to https
     helm --kube-context urumi-vps history platform -n urumi
-    ENV=prod make dod                                            # 9 passed
+    ENV=prod make dod                                            # 9 passed: 8 checks everywhere + the Secure-cookie check, which runs only over https
     ENV=prod make restore-check                                  # RESTORE CHECK: PASS

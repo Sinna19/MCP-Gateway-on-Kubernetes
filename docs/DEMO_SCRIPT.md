@@ -17,27 +17,30 @@ Everything below touches the live VPS, so it is for me to run, not Claude.
 
         ssh -i ~/.ssh/urumi-vps -o ServerAliveInterval=30 -N -L 16443:127.0.0.1:6443 azureuser@20.197.63.44
 
-   Local port 16443 matches `server: https://127.0.0.1:16443` in `~/.kube/urumi-vps.yaml`. (README VPS section still says local 6443; the kubeconfig is what counts.)
+   Local port 16443 matches `server: https://127.0.0.1:16443` in `~/.kube/urumi-vps.yaml`.
 
 3. **kubectl works against the VPS** (Git Bash):
 
         export KUBECONFIG=~/.kube/urumi-vps.yaml
         kubectl --context urumi-vps -n urumi get pods
 
-   Expect every pod 1/1 Running, `setup-*` Completed. Also `helm --kube-context urumi-vps history platform -n urumi` and check the current revision is 7 (a one-step rollback would target 6) and use that in section 6.
+   Expect every pod 1/1 Running. `setup-*` Job pods are TTL-deleted after 600s, so they may not be listed; that is expected. Also `helm --kube-context urumi-vps history platform -n urumi` and check the current revision is 7 (a one-step rollback would target 6) and use that in section 6.
 4. **Admin password** (copy, do not print on screen; paste into the login form during the recording):
 
         kubectl --context urumi-vps -n urumi get secret gateway-app -o jsonpath='{.data.admin-password}' | base64 -d | clip
 
 5. **Clean Chrome profile.** Use a new profile or guest window with autofill and password saving off. Stale saved passwords caused login lockouts before (5 bad logins locks an email for 15 min; clear it with `kubectl --context urumi-vps -n urumi rollout restart deploy/gateway`, which also drops MCP sessions, so do it before recording). Second window (Incognito) for user B.
-6. **Seed data.** Storefront has products (WooCommerce sample data from setup). Decide the product name for A to create (default: "Demo Mug", 19.99) and check it does not exist yet (storefront search). Servers page shows woo, fx, notes all Connected with 5, 2, 3 tools. If not, `ENV=prod make register`.
+6. **Seed data.** Storefront has products (WooCommerce sample data from setup). Decide the product name for A to create (default: "Demo Mug", 19.99) and check it does not exist yet (there is no storefront search; the Shop page lists all products). Use a fresh product name per rehearsal so the recording name stays unused. Servers page shows woo, fx, notes all Connected with 5, 2, 3 tools. If not, `ENV=prod make register`.
 7. **Chat is on.** Secret `llm-api` exists (`kubectl --context urumi-vps -n urumi get secret llm-api -o name`). Otherwise `/api/chat` answers 503.
 8. **User B ready.** As A: Members page, invite `b-demo@example.com` as member, copy the invite link (no email is sent), open it in the Incognito window, set a password, log in. If B already exists from an earlier session, reuse it.
 9. **Fresh API key for B**, created by B on the Keys page (shown once, starts with `umk_`). Revoke any older B keys so Section 4's revoke is unambiguous. Keep it in the clipboard or a file outside the repo (`~/.urumi-demo/b.hdr`, containing `Authorization: Bearer umk_...`).
 10. **MCP client config ready** (the key stays out of frame):
     - MCP Inspector (proven in the rehearsal): transport Streamable HTTP, URL `https://app.20.197.63.44.sslip.io/mcp`, header `Authorization: Bearer <B's key>`. Have it open and connected, then disconnect so the connect is shown live.
     - Claude Code, for the two-upstream prompt (untested, rehearse once). Off camera, from a scratch folder OUTSIDE the repo (`mkdir -p ~/urumi-demo-scratch && cd ~/urumi-demo-scratch`), default local scope, never `--scope project` (it would write the key into a `.mcp.json`): `claude mcp add --transport http urumi-demo https://app.20.197.63.44.sslip.io/mcp --header "Authorization: Bearer umk_..."`. Run `claude mcp remove urumi-demo` right after section 1.
-11. **Terminal and screen.** Terminal font 18 to 20 pt, window about 100 columns, dark background, browser zoom 125%. Close other tabs, Slack and notifications. Terminal tabs ready: (T1) tunnel, (T2) kubectl with `KUBECONFIG` exported, (T3) spare for curl.
+11. **Terminal and screen.** Terminal font 18 to 20 pt, window about 100 columns, dark background, browser zoom 125%. Close other tabs, Slack and notifications. Terminals: (T1) tunnel, (T2) kubectl with `KUBECONFIG` exported, (T3) spare, (T4) Inspector server (start before recording, keep minimized: it prints its auth token), (T5) Claude Code in the scratch folder.
+    - Before recording: enter B's key in Inspector off camera, disable claude.ai connectors in `/mcp`, turn off recaps in `/config`, apply pending Claude Code updates.
+    - Limits: per-user daily chat cap (ADR 020, UTC day, resets 05:30 IST) plus Groq rate limits.
+    - Each take: new B email (members can only be disabled, not deleted), a fresh B key, a new product name. Revoke B's key on camera every take.
 12. **Pre-type** the long commands in a scratch file (not in the repo) so the recording is not spent typing.
 13. **Rehearse sections 1 and 3 once** with the clock running; they carry the live risk.
 14. After recording: confirm `kubectl --context urumi-vps -n urumi get deploy` shows notes-mcp 1/1 and fx enabled on the Servers page.
@@ -70,7 +73,7 @@ The DoD runs once, live, in this order, with no reset between steps. It is sprea
 3. Dashboard Chat as A: "Create a product called Demo Mug priced 19.99". **Expected:** a confirm card (write tool); click Confirm; the product appears on the storefront (refresh the shop).
 4. Order Demo Mug on the shop by hand (COD). Chat: "What orders came in today?". **Expected:** one `woo__list_orders` call with no confirm card; the reply lists the new order. (Known limit: "today" is the UTC day, so an order at 00:00 to 05:30 IST counts as yesterday; ask "orders after" the date if the clock is awkward.)
 5. User B, external client (Inspector, URL + key only): connect. **Expected:** server `urumi-gateway`, tools from all three upstreams, no `woo__create_product` (admin-only). Run `woo__list_orders`. **Expected:** the same order. Then `fx__convert_currency` and `notes__add_note` to show three upstreams from one client.
-6. Two-upstream prompt, in Claude Code (started from the scratch folder) connected as B: "Take the total of today's orders and convert it to EUR." **Expected:** calls `woo__list_orders` then `fx__convert_currency`. If the model misbehaves, repeat the same prompt in the dashboard chat as A, which has the same tools (see "cannot show yet").
+6. Two-upstream prompt, in Claude Code (started from the scratch folder) connected as B: "Take the total of all orders and convert it to EUR." **Expected:** calls `woo__list_orders` then `fx__convert_currency`. Then, still as B, the three-upstream prompt: "Total all orders, convert to EUR, and save the result as a note." And the permission-boundary prompt: "Create a product called <name> priced at 12 USD" (B has no `woo__create_product`, so it refuses). Show B's rows on the Audit page after. If the model misbehaves, repeat the same prompt in the dashboard chat as A, which has the same tools (see "cannot show yet").
 
 ## 2. Kubernetes (about 2.5 min)
 

@@ -2,7 +2,7 @@
 
 WooCommerce store + woo-mcp + team MCP gateway with dashboard and chat agent, all deployed with Helm.
 
-Status: all phases built; docs and demo in Phase 9. Design: `docs/DESIGN.md`. Threat model: `docs/THREAT_MODEL.md`.
+Status: all phases complete, app live on the VPS. Design: `docs/DESIGN.md`. Threat model: `docs/THREAT_MODEL.md`.
 
 ## Run locally (k3d)
 
@@ -143,6 +143,7 @@ Numbered as the optional list in `docs/REQUIREMENTS.md`. What was skipped, and w
    - Default-deny ingress, per-workload egress policies, non-root containers (`charts/*/templates/`).
    - Upstream credentials encrypted with AES-256-GCM, key rotation with `make rotate-key` (ADR 023); k3s Secrets encryption on the VPS.
 7. **Rate limits** (the scaling half is not done, ADR 006): login, per-key `/mcp` calls and sessions, daily chat cap (ADR 020).
+8. **Observability (PARTIAL):** health/readiness probes and the per-user audit log; no metrics or alerting (`docs/DESIGN.md`).
 9. **Upgrade and rollback:** `helm rollback` rehearsed on the VPS, image tag = git tree hash (section above, ADR 024).
 
 Also built:
