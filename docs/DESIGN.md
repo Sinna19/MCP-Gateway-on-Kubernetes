@@ -92,6 +92,7 @@ Known gaps, in rough order of value. None blocks the required flows.
 - **Admin one-time password reset link.** Today an admin cannot reset a member's password; a link like the invite link (hashed, single-use, expiring) would reuse the invite code path (ADR 014).
 - **Disabled-login hint on the Members page.** A disabled user's login gives the same generic 401 as a wrong password (ADR 008); the admin sees no cue that the account is disabled.
 - **Agent system-prompt line against guessed facts.** Tell the model to say when a tool result lacks a fact instead of inventing it (`src/chat/prompt.ts`, ADR 018).
+- **Dates in chat are UTC.** The agent turns "today" into a UTC-midnight filter, so orders placed 00:00-05:30 IST count as the previous day. Fix: send the browser's timezone and put the user's local date in the agent's system prompt (`src/chat/prompt.ts`).
 - **Audit rejected `/mcp` requests.** Requests refused with 429 or 401 are not audited today; only tool calls are.
 - **Byte-counting cap in `limitedFetch`.** `MAX_TOOL_RESULT_BYTES` is checked after buffering, so a hostile upstream can still make the gateway buffer what it sends within the call timeout; the 256Mi memory limit is the only bound (THREAT_MODEL, "Upstream pagination and size caps").
 - **Default-closed tool rules.** A tool with no rule is open to members, so a new server's tools are usable until an admin marks them (ADR 022 accepts this; a per-server "new tools admin-only" default would close it).
